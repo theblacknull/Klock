@@ -169,7 +169,8 @@ async fn main() {
     // dọn định kỳ các bản ghi hết hạn (xem quy tắc trong store.rs)
     let sweep_store = store.clone();
     tokio::spawn(async move {
-        let mut tick = tokio::time::interval(Duration::from_secs(1800));
+        // chạy mỗi phút để khớp đúng mốc 5 phút/15 phút đã hứa (30 phút như trước là quá thưa)
+        let mut tick = tokio::time::interval(Duration::from_secs(60));
         loop {
             tick.tick().await;
             let n = sweep_store.sweep_expired();
