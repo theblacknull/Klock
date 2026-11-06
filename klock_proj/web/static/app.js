@@ -211,11 +211,27 @@ function creepProgress(btn, from, to, guessMs) {
   return () => clearInterval(id);
 }
 
-function postEncryptXHR(code, wrapped, onProgress) {
+// Nén gzip bằng API chuẩn của trình duyệt (không thư viện ngoài). Dữ liệu là base64 của
+// bytes đã mã hóa — gzip lấy lại gần hết phần phình do base64 gây ra (~25-30%), giúp
+// upload nhanh hơn đáng kể với file lớn. Nếu trình duyệt quá cũ không hỗ trợ thì gửi thường.
+async function gzipBlob(text) {
+  if (typeof CompressionStream === "undefined") return null;
+  const bytes = new TextEncoder().encode(text);
+  const cs = new CompressionStream("gzip");
+  const writer = cs.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  return new Blob([await new Response(cs.readable).arrayBuffer()]);
+}
+
+async function postEncryptXHR(code, wrapped, onProgress) {
+  const json = JSON.stringify({ code, wrapped });
+  const gz = await gzipBlob(json);
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/encrypt");
     xhr.setRequestHeader("Content-Type", "application/json");
+    if (gz) xhr.setRequestHeader("Content-Encoding", "gzip");
     xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
@@ -226,7 +242,7 @@ function postEncryptXHR(code, wrapped, onProgress) {
       }
     };
     xhr.onerror = () => reject(new Error("network error"));
-    xhr.send(JSON.stringify({ code, wrapped }));
+    xhr.send(gz || json);
   });
 }
 
@@ -240,6 +256,7 @@ async function doEncrypt() {
   setMsg("encMsg", "");
   document.getElementById("encOut").classList.remove("show");
   document.getElementById("encFileOut").classList.remove("show");
+  document.getElementById("copyStatus").classList.remove("show");
 
   if (!timeEl.value) return setMsg("encMsg", t("future"), true);
   const [datePart, timePart] = timeEl.value.split("T");
@@ -287,22 +304,23 @@ async function doEncrypt() {
     stop();
     setProgress(btn, 70);
 
-    const { slug } = await postEncryptXHR(code, wrapped, (frac) => setProgress(btn, 70 + frac * 30));
-    setProgress(btn, 100);
-
-    // file tải về chứa đúng dữ liệu mà server lưu — người dùng có thể tự lưu/gửi thay vì phụ thuộc link
+    // Mã hóa xong hoàn toàn cục bộ ở bước này — file tải về đã sẵn sàng ngay, không cần
+    // chờ upload. Hiện nó ra trước để người dùng có thể tải trong lúc link vẫn đang lên server.
     if (window.__encFileUrl) URL.revokeObjectURL(window.__encFileUrl);
     const fileBlob = new Blob([JSON.stringify({ code, wrapped })], { type: "application/json" });
     const fileUrl = URL.createObjectURL(fileBlob);
     window.__encFileUrl = fileUrl;
     const dl = document.getElementById("encFileDownload");
     dl.href = fileUrl;
-    dl.download = `klock-${slug}.json`;
+    dl.download = `klock-${x0}.json`;
+    document.getElementById("encFileOut").classList.add("show");
+
+    const { slug } = await postEncryptXHR(code, wrapped, (frac) => setProgress(btn, 70 + frac * 30));
+    setProgress(btn, 100);
 
     const link = location.origin + "/" + slug;
     document.getElementById("encLink").textContent = link;
     document.getElementById("encOut").classList.add("show");
-    document.getElementById("encFileOut").classList.add("show");
     document.getElementById("shareBtn").classList.toggle("hidden", !navigator.share);
     window.__lastLink = link;
     window.__lastEncSlug = slug;
@@ -317,7 +335,13 @@ async function doEncrypt() {
 
 function copyLink() {
   if (window.__lastLink) {
-    navigator.clipboard.writeText(window.__lastLink).then(() => setMsg("encMsg", t("copied"), false));
+    navigator.clipboard.writeText(window.__lastLink).then(() => {
+      const el = document.getElementById("copyStatus");
+      el.textContent = t("copied");
+      el.classList.add("show");
+      clearTimeout(window.__copyStatusTimer);
+      window.__copyStatusTimer = setTimeout(() => el.classList.remove("show"), 1500);
+    });
   }
 }
 

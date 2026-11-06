@@ -16,6 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use store::Store;
 use tower::util::ServiceExt;
+use tower_http::decompression::RequestDecompressionLayer;
 use tower_http::services::ServeDir;
 use axum::http::header::CACHE_CONTROL;
 use axum::http::HeaderValue;
@@ -192,6 +193,7 @@ async fn main() {
         .route("/api/item/:slug/downloaded", post(downloaded))
         .route("/api/item/:slug/confirm-payment", post(confirm_payment))
         .layer(DefaultBodyLimit::max(MAX_WRAPPED_BYTES as usize + 4096))
+        .layer(RequestDecompressionLayer::new().gzip(true))
         .fallback(spa_fallback)
         .with_state(app);
 

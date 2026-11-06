@@ -281,6 +281,10 @@ button.link:active { transform: none; }
 }
 .out.show { display: block; animation: fade .3s ease; }
 .out .label { font-size: 11px; color: var(--good); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+.labelRow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.labelRow .label { margin-bottom: 0; }
+.copyStatus { font-size: 11px; color: var(--txt); font-weight: 600; opacity: 0; transition: opacity .2s ease; }
+.copyStatus.show { opacity: 1; }
 #encFileOut + #encOut { margin-top: 10px; }
 .btnWhite {
   background: #ffffff; color: #0a0b12; border: none;
