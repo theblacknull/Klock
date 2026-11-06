@@ -115,6 +115,16 @@ input[type="text"]:focus, input[type="datetime-local"]:focus, textarea:focus {
 textarea { resize: vertical; min-height: 76px; line-height: 1.45; }
 input[type="datetime-local"] { color-scheme: dark; }
 
+.fileRow { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.fileRow button.small, button.small { width: auto; margin-top: 0; padding: 7px 12px; font-size: 12.5px; }
+.fileName { font-size: 12.5px; color: var(--sub); word-break: break-all; }
+#decOutFile { margin-top: 10px; }
+#decOutFile img { max-width: 100%; border-radius: 10px; margin-bottom: 10px; display: block; }
+a.btnlike {
+  display: inline-block; text-decoration: none; text-align: center;
+  width: 100%; margin-top: 8px; padding: 11px; border-radius: 12px; font-weight: 700; font-size: 14px;
+}
+
 button {
   width: 100%; margin-top: 18px; position: relative;
   background: linear-gradient(135deg, var(--accent), #6a79ff);

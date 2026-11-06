@@ -10,6 +10,63 @@ const drandClient = mainnetClient();
 
 function pad(n, w) { return String(n).padStart(w, "0"); }
 
+// ---- gói tin: text hoặc file, đóng gói trước khi mã hóa AES-GCM (AES không quan tâm nội dung) ----
+const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
+let selectedFile = null; // File | null
+
+function onFilePicked() {
+  const input = document.getElementById("encFile");
+  const f = input.files && input.files[0];
+  setMsg("encMsg", "");
+  if (!f) return;
+  if (f.size > MAX_FILE_SIZE) {
+    setMsg("encMsg", t("fileTooLarge"), true);
+    input.value = "";
+    return;
+  }
+  selectedFile = f;
+  document.getElementById("encFileName").textContent = `${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
+  document.getElementById("encFileClear").classList.remove("hidden");
+  document.getElementById("encMessage").disabled = true;
+}
+
+function clearFile() {
+  selectedFile = null;
+  document.getElementById("encFile").value = "";
+  document.getElementById("encFileName").textContent = "";
+  document.getElementById("encFileClear").classList.add("hidden");
+  document.getElementById("encMessage").disabled = false;
+}
+
+async function buildEnvelope(message) {
+  if (!selectedFile) return new Uint8Array([0, ...enc.encode(message)]);
+  const fileBytes = new Uint8Array(await selectedFile.arrayBuffer());
+  const fnBytes = enc.encode(selectedFile.name);
+  const mimeBytes = enc.encode(selectedFile.type || "application/octet-stream");
+  const head = new Uint8Array(1 + 2 + fnBytes.length + 2 + mimeBytes.length);
+  const dv = new DataView(head.buffer);
+  head[0] = 1;
+  dv.setUint16(1, fnBytes.length);
+  head.set(fnBytes, 3);
+  dv.setUint16(3 + fnBytes.length, mimeBytes.length);
+  head.set(mimeBytes, 3 + fnBytes.length + 2);
+  const out = new Uint8Array(head.length + fileBytes.length);
+  out.set(head, 0);
+  out.set(fileBytes, head.length);
+  return out;
+}
+
+function parseEnvelope(bytes) {
+  if (bytes[0] === 0) return { isFile: false, text: dec.decode(bytes.slice(1)) };
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let off = 1;
+  const fnLen = dv.getUint16(off); off += 2;
+  const filename = dec.decode(bytes.slice(off, off + fnLen)); off += fnLen;
+  const mimeLen = dv.getUint16(off); off += 2;
+  const mime = dec.decode(bytes.slice(off, off + mimeLen)); off += mimeLen;
+  return { isFile: true, filename, mime, fileBytes: bytes.slice(off) };
+}
+
 function tzLabel(mins) {
   const sign = mins >= 0 ? "+" : "-";
   const a = Math.abs(mins);
@@ -105,15 +162,17 @@ async function doEncrypt() {
   const code = x0 + dateStr;
 
   setMsg("encMsg", t("working"));
+  const payload = await buildEnvelope(message);
   const secretBytes = enc.encode(secret);
   const x0Bytes = enc.encode(x0);
   const key = await deriveKey(secretBytes, x0Bytes);
   const nonceBytes = await nonceOf(x0Bytes);
   const aad = enc.encode(code);
-  const ct = await gcmEncrypt(key, nonceBytes, aad, enc.encode(message));
+  const ct = await gcmEncrypt(key, nonceBytes, aad, payload);
 
   secretEl.value = "";
   msgEl.value = "";
+  clearFile();
   setMsg("encMsg", "");
 
   try {
@@ -159,8 +218,18 @@ function goStep(n) {
 function resetDecrypt() {
   pending = null;
   document.getElementById("decOut").classList.remove("show");
+  document.getElementById("decOutFile").classList.add("hidden");
+  document.getElementById("decOutText").classList.remove("hidden");
+  revokeDecObjectUrl();
   setMsg("decMsg", "");
   goStep(1);
+}
+
+function revokeDecObjectUrl() {
+  if (window.__decObjectUrl) {
+    URL.revokeObjectURL(window.__decObjectUrl);
+    window.__decObjectUrl = null;
+  }
 }
 
 async function doDecryptCheck() {
@@ -205,7 +274,32 @@ async function doDecryptFinal() {
   const aad = enc.encode(code);
   try {
     const pt = await gcmDecrypt(key, nonceBytes, aad, ct);
-    document.getElementById("decOutText").textContent = dec.decode(pt);
+    const envelope = parseEnvelope(pt);
+    revokeDecObjectUrl();
+    const textEl = document.getElementById("decOutText");
+    const fileBox = document.getElementById("decOutFile");
+    if (envelope.isFile) {
+      textEl.classList.add("hidden");
+      fileBox.classList.remove("hidden");
+      const blob = new Blob([envelope.fileBytes], { type: envelope.mime });
+      const url = URL.createObjectURL(blob);
+      window.__decObjectUrl = url;
+      const img = document.getElementById("decOutImg");
+      if (envelope.mime.startsWith("image/")) {
+        img.src = url;
+        img.classList.remove("hidden");
+      } else {
+        img.classList.add("hidden");
+      }
+      document.getElementById("decOutFileName").textContent = envelope.filename;
+      const dl = document.getElementById("decOutDownload");
+      dl.href = url;
+      dl.download = envelope.filename;
+    } else {
+      fileBox.classList.add("hidden");
+      textEl.classList.remove("hidden");
+      textEl.textContent = envelope.text;
+    }
     document.getElementById("decOut").classList.add("show");
     setMsg("decMsg", "");
   } catch (e) {
@@ -220,6 +314,8 @@ window.copyLink = copyLink;
 window.doDecryptCheck = doDecryptCheck;
 window.doDecryptFinal = doDecryptFinal;
 window.resetDecrypt = resetDecrypt;
+window.onFilePicked = onFilePicked;
+window.clearFile = clearFile;
 
 (function init() {
   applyLang();

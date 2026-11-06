@@ -1,15 +1,15 @@
 mod ratelimit;
 mod store;
 
-use axum::extract::{ConnectInfo, Path, State};
-use axum::http::StatusCode;
+use axum::extract::{ConnectInfo, DefaultBodyLimit, Path, State};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Json};
 use axum::routing::{get, post};
 use axum::Router;
 use rand::Rng;
 use ratelimit::RateLimiter;
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 use store::{Record, Store};
@@ -17,6 +17,21 @@ use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 use axum::http::header::CACHE_CONTROL;
 use axum::http::HeaderValue;
+
+/// Lấy IP thật của client. Khi chạy sau Nginx/reverse proxy, kết nối TCP trực tiếp
+/// luôn là proxy (127.0.0.1) nên phải đọc X-Forwarded-For / X-Real-IP do proxy gắn vào.
+/// Chỉ an toàn khi server KHÔNG lộ trực tiếp ra Internet (luôn đứng sau proxy tin cậy) —
+/// đúng với cách triển khai khuyến nghị (bind 127.0.0.1, Nginx/Caddy đứng trước).
+fn client_ip(headers: &HeaderMap, fallback: SocketAddr) -> IpAddr {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(',').next())
+        .map(str::trim)
+        .and_then(|s| s.parse().ok())
+        .or_else(|| headers.get("x-real-ip").and_then(|v| v.to_str().ok()).and_then(|s| s.parse().ok()))
+        .unwrap_or(fallback.ip())
+}
 
 const SLUG_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -44,9 +59,10 @@ fn gen_slug() -> String {
 async fn encrypt(
     State(app): State<Arc<App>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(req): Json<EncryptReq>,
 ) -> impl IntoResponse {
-    if !app.encrypt_limiter.allow(addr.ip()) {
+    if !app.encrypt_limiter.allow(client_ip(&headers, addr)) {
         return (StatusCode::TOO_MANY_REQUESTS, "quá nhiều yêu cầu, thử lại sau").into_response();
     }
     if req.code.len() < 15 || req.wrapped.is_empty() {
@@ -69,6 +85,7 @@ async fn item(State(app): State<Arc<App>>, Path(slug): Path<String>) -> impl Int
 
 #[tokio::main]
 async fn main() {
+    let _ = dotenvy::dotenv(); // đọc .env nếu có, không bắt buộc phải tồn tại
     let data_path = std::env::var("KLOCK_DB").unwrap_or_else(|_| "klock_web_data.json".into());
     let static_dir = std::env::var("KLOCK_STATIC").unwrap_or_else(|_| "static".into());
     let app = Arc::new(App {
@@ -83,6 +100,7 @@ async fn main() {
     let router = Router::new()
         .route("/api/encrypt", post(encrypt))
         .route("/api/item/:slug", get(item))
+        .layer(DefaultBodyLimit::max(15 * 1024 * 1024)) // 8MB file + overhead armor/base64
         .with_state(app)
         .fallback_service(serve_dir);
 

@@ -40,6 +40,14 @@
     <input id="encSecret" type="text" autocomplete="off" />
     <label data-i18n="message"></label>
     <textarea id="encMessage"></textarea>
+
+    <div class="fileRow">
+      <button type="button" class="secondary small" onclick="document.getElementById('encFile').click()" data-i18n="attachFile"></button>
+      <span id="encFileName" class="fileName"></span>
+      <button type="button" class="link small hidden" id="encFileClear" onclick="clearFile()" data-i18n="removeFile"></button>
+    </div>
+    <input id="encFile" type="file" class="hidden" onchange="onFilePicked()" />
+
     <label data-i18n="unlock"></label>
     <div class="row">
       <select id="encTz"></select>
@@ -73,6 +81,11 @@
     <div class="out" id="decOut">
       <div class="label" data-i18n="result"></div>
       <div id="decOutText" class="out-text"></div>
+      <div id="decOutFile" class="hidden">
+        <img id="decOutImg" class="hidden" />
+        <div id="decOutFileName" class="fileName"></div>
+        <a id="decOutDownload" class="secondary btnlike" download data-i18n="downloadFile"></a>
+      </div>
     </div>
   </div>
 </div>

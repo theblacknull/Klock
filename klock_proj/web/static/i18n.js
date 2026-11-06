@@ -8,6 +8,8 @@ const I18N = {
     future: "Pick a time in the future.", backLink: "← Use a different link",
     networkErr: "Network error, try again.", encryptErr: "Encryption failed.",
     working: "Processing…",
+    attachFile: "Attach file", removeFile: "Remove", downloadFile: "Download",
+    fileTooLarge: "File too large (max 8MB).",
   },
   ru: {
     secret: "Общий секрет", message: "Сообщение", unlock: "Время открытия",
@@ -18,6 +20,8 @@ const I18N = {
     future: "Выберите время в будущем.", backLink: "← Другая ссылка",
     networkErr: "Ошибка сети, попробуйте снова.", encryptErr: "Ошибка шифрования.",
     working: "Обработка…",
+    attachFile: "Прикрепить файл", removeFile: "Убрать", downloadFile: "Скачать",
+    fileTooLarge: "Файл слишком большой (макс. 8МБ).",
   },
   vi: {
     secret: "Bí mật chung", message: "Thông điệp", unlock: "Thời gian mở",
@@ -28,6 +32,8 @@ const I18N = {
     future: "Chọn thời gian ở tương lai.", backLink: "← Dùng link khác",
     networkErr: "Lỗi mạng, thử lại.", encryptErr: "Mã hóa thất bại.",
     working: "Đang xử lý…",
+    attachFile: "Đính kèm file", removeFile: "Bỏ chọn", downloadFile: "Tải xuống",
+    fileTooLarge: "File quá lớn (tối đa 8MB).",
   },
   zh: {
     secret: "共享密钥", message: "消息", unlock: "解锁时间",
@@ -38,6 +44,8 @@ const I18N = {
     future: "请选择未来的时间。", backLink: "← 使用其他链接",
     networkErr: "网络错误，请重试。", encryptErr: "加密失败。",
     working: "处理中…",
+    attachFile: "附加文件", removeFile: "移除", downloadFile: "下载",
+    fileTooLarge: "文件过大（最大 8MB）。",
   },
   es: {
     secret: "Secreto compartido", message: "Mensaje", unlock: "Hora de apertura",
@@ -48,6 +56,8 @@ const I18N = {
     future: "Elige una hora futura.", backLink: "← Usar otro enlace",
     networkErr: "Error de red, inténtalo de nuevo.", encryptErr: "Error al cifrar.",
     working: "Procesando…",
+    attachFile: "Adjuntar archivo", removeFile: "Quitar", downloadFile: "Descargar",
+    fileTooLarge: "Archivo demasiado grande (máx. 8MB).",
   },
 };
 

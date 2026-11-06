@@ -1,0 +1,5 @@
+/target
+/web/target
+web/.env
+web/klock_web_data.json
+*.pdb
