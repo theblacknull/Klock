@@ -155,7 +155,7 @@ async fn spa_fallback(State(app): State<Arc<App>>, req: Request<Body>) -> axum::
             Err(_) => return StatusCode::NOT_FOUND.into_response(),
         },
     };
-    res.headers_mut().insert(CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    res.headers_mut().insert(CACHE_CONTROL, HeaderValue::from_static("no-store, no-cache, must-revalidate, max-age=0"));
     res
 }
 
