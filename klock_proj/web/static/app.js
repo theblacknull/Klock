@@ -14,7 +14,7 @@ function pad(n, w) { return String(n).padStart(w, "0"); }
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
 let selectedFile = null; // File | null
 
-function truncateMiddle(name, max = 30) {
+function truncateMiddle(name, max = 26) {
   if (name.length <= max) return name;
   const half = Math.floor((max - 1) / 2);
   return name.slice(0, half) + "…" + name.slice(name.length - (max - 1 - half));

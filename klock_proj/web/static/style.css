@@ -127,9 +127,13 @@ input[type="datetime-local"] { color-scheme: dark; }
 .fileIconBtn:hover { color: var(--txt); background: rgba(255, 255, 255, 0.12); filter: none; }
 .fileChip {
   position: absolute; inset: 1px; border-radius: 11px; background: var(--field);
-  display: flex; align-items: center; justify-content: center; gap: 10px; padding: 0 44px 0 14px;
+  display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 42px 0 12px;
+  overflow: hidden;
 }
-.fileChip span { font-size: 13.5px; color: var(--txt); font-weight: 500; white-space: nowrap; }
+.fileChip span {
+  font-size: 12px; color: var(--txt); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
 .fileChipClear {
   width: 22px; height: 22px; margin: 0; padding: 0; flex: none; border-radius: 7px;
   background: rgba(255, 255, 255, 0.08); border: none; color: var(--sub); box-shadow: none;
