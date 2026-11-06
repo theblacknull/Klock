@@ -1,9 +1,10 @@
 mod ratelimit;
 mod store;
 
-use axum::extract::{ConnectInfo, DefaultBodyLimit, Path, State};
+use axum::body::Body;
+use axum::extract::{ConnectInfo, DefaultBodyLimit, Path, Request, State};
 use axum::http::{HeaderMap, StatusCode};
-use axum::response::{IntoResponse, Json};
+use axum::response::{Html, IntoResponse, Json};
 use axum::routing::{get, post};
 use axum::Router;
 use rand::Rng;
@@ -12,9 +13,9 @@ use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
-use store::{Record, Store};
-use tower_http::services::{ServeDir, ServeFile};
-use tower_http::set_header::SetResponseHeaderLayer;
+use store::Store;
+use tower::util::ServiceExt;
+use tower_http::services::ServeDir;
 use axum::http::header::CACHE_CONTROL;
 use axum::http::HeaderValue;
 
@@ -34,10 +35,12 @@ fn client_ip(headers: &HeaderMap, fallback: SocketAddr) -> IpAddr {
 }
 
 const SLUG_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const MAX_WRAPPED_BYTES: u64 = 150 * 1024 * 1024; // ~100MB file gốc + overhead armor/base64
 
 struct App {
     store: Store,
     encrypt_limiter: RateLimiter,
+    static_dir: String,
 }
 
 #[derive(Deserialize)]
@@ -68,41 +71,72 @@ async fn encrypt(
     if req.code.len() < 15 || req.wrapped.is_empty() {
         return (StatusCode::BAD_REQUEST, "dữ liệu không hợp lệ").into_response();
     }
+    if req.wrapped.len() as u64 > MAX_WRAPPED_BYTES {
+        return (StatusCode::PAYLOAD_TOO_LARGE, "file quá lớn").into_response();
+    }
     let mut slug = gen_slug();
     while app.store.contains(&slug) {
         slug = gen_slug();
     }
-    app.store.insert(slug.clone(), Record { code: req.code, wrapped: req.wrapped });
+    app.store.insert(&slug, req.code, req.wrapped);
     Json(EncryptResp { slug }).into_response()
 }
 
 async fn item(State(app): State<Arc<App>>, Path(slug): Path<String>) -> impl IntoResponse {
-    match app.store.get(&slug) {
+    match app.store.get_and_touch(&slug) {
         Some(r) => Json(r).into_response(),
         None => (StatusCode::NOT_FOUND, "không tìm thấy").into_response(),
     }
 }
 
+/// Phục vụ file tĩnh; nếu không khớp file nào (vd link dạng /ABC123) thì trả về index.html
+/// với mã 200 (SPA fallback đúng nghĩa) thay vì 404, để trang luôn tải và chạy JS bình thường.
+async fn spa_fallback(State(app): State<Arc<App>>, req: Request<Body>) -> axum::response::Response {
+    let serve_dir = ServeDir::new(&app.static_dir);
+    let serve_result: Result<_, std::convert::Infallible> = serve_dir.oneshot(req).await;
+    let mut res: axum::response::Response = match serve_result {
+        Ok(res) if res.status() != StatusCode::NOT_FOUND => res.into_response(),
+        _ => match tokio::fs::read_to_string(format!("{}/index.html", app.static_dir)).await {
+            Ok(html) => Html(html).into_response(),
+            Err(_) => return StatusCode::NOT_FOUND.into_response(),
+        },
+    };
+    res.headers_mut().insert(CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    res
+}
+
 #[tokio::main]
 async fn main() {
     let _ = dotenvy::dotenv(); // đọc .env nếu có, không bắt buộc phải tồn tại
-    let data_path = std::env::var("KLOCK_DB").unwrap_or_else(|_| "klock_web_data.json".into());
+    let data_dir = std::env::var("KLOCK_DB").unwrap_or_else(|_| "klock_data".into());
     let static_dir = std::env::var("KLOCK_STATIC").unwrap_or_else(|_| "static".into());
-    let app = Arc::new(App {
-        store: Store::open(data_path.into()),
-        encrypt_limiter: RateLimiter::new(20, Duration::from_secs(300)), // 20 lần/5 phút mỗi IP
+    let store = Store::open(data_dir.into());
+
+    // dọn định kỳ các bản ghi hết hạn (xem quy tắc trong store.rs)
+    let sweep_store = store.clone();
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(Duration::from_secs(1800));
+        loop {
+            tick.tick().await;
+            let n = sweep_store.sweep_expired();
+            if n > 0 {
+                println!("klock-web: đã dọn {n} bản ghi hết hạn");
+            }
+        }
     });
 
-    let serve_dir = tower::ServiceBuilder::new()
-        .layer(SetResponseHeaderLayer::overriding(CACHE_CONTROL, HeaderValue::from_static("no-cache")))
-        .service(ServeDir::new(&static_dir).not_found_service(ServeFile::new(format!("{static_dir}/index.html"))));
+    let app = Arc::new(App {
+        store,
+        encrypt_limiter: RateLimiter::new(20, Duration::from_secs(300)), // 20 lần/5 phút mỗi IP
+        static_dir,
+    });
 
     let router = Router::new()
         .route("/api/encrypt", post(encrypt))
         .route("/api/item/:slug", get(item))
-        .layer(DefaultBodyLimit::max(15 * 1024 * 1024)) // 8MB file + overhead armor/base64
-        .with_state(app)
-        .fallback_service(serve_dir);
+        .layer(DefaultBodyLimit::max(MAX_WRAPPED_BYTES as usize + 4096))
+        .fallback(spa_fallback)
+        .with_state(app);
 
     let addr = std::env::var("KLOCK_ADDR").unwrap_or_else(|_| "127.0.0.1:8787".into());
     println!("klock-web listening on http://{addr}");

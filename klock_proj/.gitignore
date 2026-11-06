@@ -2,4 +2,5 @@
 /web/target
 web/.env
 web/klock_web_data.json
+web/klock_data/
 *.pdb

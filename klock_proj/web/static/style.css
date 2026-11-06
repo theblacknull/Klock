@@ -68,6 +68,30 @@ body::after { background: #16d9b4; bottom: -22vmax; right: -15vmax; animation-de
 .logo svg { width: 16px; height: 16px; }
 h1 { font-size: 18px; margin: 0; font-weight: 700; letter-spacing: -0.01em; }
 
+.topRight { display: flex; align-items: center; gap: 8px; position: relative; }
+.infoBtn {
+  width: 26px; height: 26px; margin: 0; padding: 0; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--field); color: var(--sub); border: 1px solid var(--field-border);
+  border-radius: 50%; box-shadow: none; font-size: 12.5px; font-weight: 800; font-style: italic;
+  font-family: Georgia, 'Times New Roman', serif; cursor: pointer;
+}
+.infoBtn:hover { color: var(--txt); background: rgba(255, 255, 255, 0.1); filter: none; }
+
+.infoPanel {
+  position: relative; margin: -8px 0 18px; padding: 14px 34px 14px 16px;
+  background: var(--field); border: 1px solid var(--field-border); border-radius: 12px;
+  animation: fade .2s ease;
+}
+.infoPanel ul { margin: 0; padding: 0 0 0 16px; }
+.infoPanel li { font-size: 12.5px; color: var(--sub); line-height: 1.6; margin-bottom: 4px; }
+.infoPanel li:last-child { margin-bottom: 0; }
+.infoClose {
+  position: absolute; top: 10px; right: 10px; width: 20px; height: 20px; margin: 0; padding: 0;
+  background: none; border: none; box-shadow: none; color: var(--sub); font-size: 11px; cursor: pointer;
+}
+.infoClose:hover { color: var(--txt); filter: none; }
+
 .langWrap { position: relative; }
 select {
   appearance: none; -webkit-appearance: none;
@@ -77,9 +101,13 @@ select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%238d93a8'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 7px center; background-size: 14px;
   transition: border-color .15s;
+  color-scheme: dark; /* popup dropdown gốc trình duyệt render tối màu, đồng nhất giao diện */
 }
 select:hover { border-color: rgba(255, 255, 255, 0.2); }
 select:focus { outline: none; border-color: var(--accent); }
+select option {
+  background: #171a28; color: var(--txt);
+}
 
 .tabs {
   display: flex; gap: 4px; margin-bottom: 22px; padding: 4px;
@@ -112,12 +140,14 @@ input[type="text"]:focus, input[type="datetime-local"]:focus, textarea:focus {
   outline: none; border-color: var(--accent); background: rgba(124, 140, 255, 0.06);
   box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.15);
 }
-textarea { resize: vertical; min-height: 76px; line-height: 1.45; }
+textarea { resize: none; min-height: 76px; line-height: 1.45; }
 input[type="datetime-local"] { color-scheme: dark; }
 
 .msgWrap { position: relative; }
+.msgWrap > input[type="text"] { padding-right: 46px; }
+.linkLabelSpaced { margin-top: 16px; }
 .fileIconBtn {
-  position: absolute; top: 9px; right: 9px; width: 28px; height: 28px; margin: 0; padding: 0;
+  position: absolute; bottom: 9px; right: 9px; width: 28px; height: 28px; margin: 0; padding: 0;
   display: flex; align-items: center; justify-content: center;
   background: rgba(255, 255, 255, 0.07); border: 1px solid var(--field-border);
   border-radius: 8px; color: var(--sub); box-shadow: none; cursor: pointer;
@@ -144,9 +174,10 @@ input[type="datetime-local"] { color-scheme: dark; }
 #decOutFile { margin-top: 10px; }
 #decOutFile img { max-width: 100%; border-radius: 10px; margin-bottom: 10px; display: block; }
 a.btnlike {
-  display: inline-block; text-decoration: none; text-align: center;
+  display: flex; align-items: center; justify-content: center; gap: 7px; text-decoration: none;
   width: 100%; margin-top: 8px; padding: 11px; border-radius: 12px; font-weight: 700; font-size: 14px;
 }
+a.btnlike svg { width: 16px; height: 16px; flex: none; }
 
 button {
   width: 100%; margin-top: 18px; position: relative;
@@ -185,11 +216,14 @@ button.link {
 button.link:hover { color: var(--txt); filter: none; }
 button.link:active { transform: none; }
 
+.btnRow { display: flex; gap: 8px; }
+.btnRow > button { margin-top: 0; }
+
 .row { display: flex; gap: 8px; min-width: 0; }
 .row > * { flex: 1; min-width: 0; }
 .row > input[type="text"] { max-width: 80px; text-align: center; }
 .row > select {
-  flex: none; width: 112px; padding: 11px 24px 11px 12px; font-size: 13px;
+  flex: none; width: 128px; padding: 11px 24px 11px 12px; font-size: 13px;
   border-radius: 12px; background-position: right 10px center;
 }
 

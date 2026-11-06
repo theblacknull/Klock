@@ -11,7 +11,7 @@ const drandClient = mainnetClient();
 function pad(n, w) { return String(n).padStart(w, "0"); }
 
 // ---- gói tin: text hoặc file, đóng gói trước khi mã hóa AES-GCM (AES không quan tâm nội dung) ----
-const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 let selectedFile = null; // File | null
 
 function truncateMiddle(name, max = 26) {
@@ -45,6 +45,39 @@ function clearFile() {
   document.getElementById("encFileChip").classList.add("hidden");
   document.getElementById("attachBtn").classList.remove("hidden");
   document.getElementById("encMessage").disabled = false;
+}
+
+// ---- upload file mã hóa (.klock.json) lúc giải mã — bỏ qua hẳn việc hỏi server ----
+let decFilePayload = null; // { code, wrapped } | null
+
+async function onDecFilePicked() {
+  const input = document.getElementById("decFile");
+  const f = input.files && input.files[0];
+  setMsg("decMsg", "");
+  if (!f) return;
+  try {
+    const obj = JSON.parse(await f.text());
+    if (typeof obj.code !== "string" || typeof obj.wrapped !== "string") throw new Error("bad format");
+    decFilePayload = obj;
+  } catch (e) {
+    setMsg("decMsg", t("notDecrypted"), true);
+    input.value = "";
+    return;
+  }
+  document.getElementById("decFileChipName").textContent = truncateMiddle(f.name);
+  document.getElementById("decFileChip").classList.remove("hidden");
+  document.getElementById("decAttachBtn").classList.add("hidden");
+  const inputEl = document.getElementById("decInput");
+  inputEl.value = "";
+  inputEl.disabled = true;
+}
+
+function clearDecFile() {
+  decFilePayload = null;
+  document.getElementById("decFile").value = "";
+  document.getElementById("decFileChip").classList.add("hidden");
+  document.getElementById("decAttachBtn").classList.remove("hidden");
+  document.getElementById("decInput").disabled = false;
 }
 
 async function buildEnvelope(message) {
@@ -256,9 +289,19 @@ async function doEncrypt() {
     const { slug } = await postEncryptXHR(code, wrapped, (frac) => setProgress(btn, 70 + frac * 30));
     setProgress(btn, 100);
 
+    // file tải về chứa đúng dữ liệu mà server lưu — người dùng có thể tự lưu/gửi thay vì phụ thuộc link
+    if (window.__encFileUrl) URL.revokeObjectURL(window.__encFileUrl);
+    const fileBlob = new Blob([JSON.stringify({ code, wrapped })], { type: "application/json" });
+    const fileUrl = URL.createObjectURL(fileBlob);
+    window.__encFileUrl = fileUrl;
+    const dl = document.getElementById("encFileDownload");
+    dl.href = fileUrl;
+    dl.download = `klock-${slug}.json`;
+
     const link = location.origin + "/" + slug;
     document.getElementById("encLink").textContent = link;
     document.getElementById("encOut").classList.add("show");
+    document.getElementById("shareBtn").classList.toggle("hidden", !navigator.share);
     window.__lastLink = link;
   } catch (e) {
     console.error("klock encrypt failed:", e);
@@ -271,6 +314,12 @@ async function doEncrypt() {
 function copyLink() {
   if (window.__lastLink) {
     navigator.clipboard.writeText(window.__lastLink).then(() => setMsg("encMsg", t("copied"), false));
+  }
+}
+
+function shareLink() {
+  if (window.__lastLink && navigator.share) {
+    navigator.share({ url: window.__lastLink }).catch(() => {});
   }
 }
 
@@ -289,6 +338,8 @@ function goStep(n) {
 
 function resetDecrypt() {
   pending = null;
+  clearDecFile();
+  document.getElementById("decInput").value = "";
   document.getElementById("decOut").classList.remove("show");
   document.getElementById("decOutFile").classList.add("hidden");
   document.getElementById("decOutText").classList.remove("hidden");
@@ -306,19 +357,27 @@ function revokeDecObjectUrl() {
 
 async function doDecryptCheck() {
   const btn = document.getElementById("decCheckBtn");
-  const input = document.getElementById("decInput").value;
-  const slug = extractSlug(input);
   document.getElementById("decOut").classList.remove("show");
   setMsg("decMsg", "");
-  if (!/^[A-Za-z0-9]{6}$/.test(slug)) { goStep(1); return setMsg("decMsg", t("notDecrypted"), true); }
 
-  startProgress(btn);
-  try {
+  let code, wrapped;
+  if (decFilePayload) {
+    // dữ liệu lấy thẳng từ file người dùng tải lên — không cần hỏi server
+    ({ code, wrapped } = decFilePayload);
+  } else {
+    const slug = extractSlug(document.getElementById("decInput").value);
+    if (!/^[A-Za-z0-9]{6}$/.test(slug)) { goStep(1); return setMsg("decMsg", t("notDecrypted"), true); }
+    startProgress(btn);
     setProgress(btn, 10);
     const r = await fetch("/api/item/" + slug);
-    if (!r.ok) { goStep(1); return setMsg("decMsg", t("notDecrypted"), true); }
+    if (!r.ok) { endProgress(btn); goStep(1); return setMsg("decMsg", t("notDecrypted"), true); }
     setProgress(btn, 35);
-    const { code, wrapped } = await r.json();
+    ({ code, wrapped } = await r.json());
+  }
+
+  if (!btn.classList.contains("progress")) startProgress(btn);
+  try {
+    setProgress(btn, 35);
     let plainWrapped;
     const stop = creepProgress(btn, 35, 95, 1500); // thời gian mạng tới drand không biết trước
     try {
@@ -402,11 +461,15 @@ async function doDecryptFinal() {
 window.showTab = showTab;
 window.doEncrypt = doEncrypt;
 window.copyLink = copyLink;
+window.shareLink = shareLink;
 window.doDecryptCheck = doDecryptCheck;
 window.doDecryptFinal = doDecryptFinal;
 window.resetDecrypt = resetDecrypt;
 window.onFilePicked = onFilePicked;
 window.clearFile = clearFile;
+window.onDecFilePicked = onDecFilePicked;
+window.clearDecFile = clearDecFile;
+window.toggleInfo = () => document.getElementById("infoPanel").classList.toggle("hidden");
 
 (function init() {
   applyLang();
