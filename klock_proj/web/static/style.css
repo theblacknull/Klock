@@ -41,7 +41,7 @@ body::after { background: #16d9b4; bottom: -22vmax; right: -15vmax; animation-de
 
 .card {
   position: relative; z-index: 1;
-  width: 100%; max-width: 440px;
+  width: 100%; max-width: 440px; min-width: 0;
   background: var(--card);
   backdrop-filter: blur(24px) saturate(140%);
   -webkit-backdrop-filter: blur(24px) saturate(140%);
@@ -185,8 +185,8 @@ button.link {
 button.link:hover { color: var(--txt); filter: none; }
 button.link:active { transform: none; }
 
-.row { display: flex; gap: 8px; }
-.row > * { flex: 1; }
+.row { display: flex; gap: 8px; min-width: 0; }
+.row > * { flex: 1; min-width: 0; }
 .row > input[type="text"] { max-width: 80px; text-align: center; }
 .row > select {
   flex: none; width: 112px; padding: 11px 24px 11px 12px; font-size: 13px;
@@ -227,4 +227,9 @@ button.link:active { transform: none; }
 
 @media (max-width: 480px) {
   .card { padding: 22px 18px; border-radius: 16px; }
+}
+
+@media (max-width: 400px) {
+  .row { flex-direction: column; }
+  .row > select { width: 100%; }
 }
