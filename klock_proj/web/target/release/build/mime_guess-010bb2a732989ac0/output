@@ -1,0 +1,1 @@
+cargo:rustc-env=MIME_TYPES_GENERATED_PATH=C:\Users\DELL\Desktop\klock_proj\klock_proj\web\target\release\build\mime_guess-010bb2a732989ac0\out\mime_types_generated.rs

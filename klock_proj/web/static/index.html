@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Klock</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div class="card">
+  <div class="top">
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="9" stroke="white" stroke-width="2"/>
+          <path d="M12 7v5l3.5 2" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h1>Klock</h1>
+    </div>
+    <div class="langWrap">
+      <select id="langSel" onchange="setLang(this.value)">
+        <option value="en">EN</option>
+        <option value="ru">RU</option>
+        <option value="vi">VI</option>
+        <option value="zh">ZH</option>
+        <option value="es">ES</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tabEncBtn" data-i18n="tabEncrypt" onclick="showTab('enc')"></div>
+    <div class="tab" id="tabDecBtn" data-i18n="tabDecrypt" onclick="showTab('dec')"></div>
+  </div>
+
+  <!-- ENCRYPT -->
+  <div class="panel active" id="panelEnc">
+    <label data-i18n="secret"></label>
+    <input id="encSecret" type="text" autocomplete="off" />
+    <label data-i18n="message"></label>
+    <textarea id="encMessage"></textarea>
+    <label data-i18n="unlock"></label>
+    <div class="row">
+      <select id="encTz"></select>
+      <input id="encTime" type="datetime-local" step="1" />
+    </div>
+    <button onclick="doEncrypt()" data-i18n="encryptBtn"></button>
+    <div class="msg" id="encMsg"></div>
+    <div class="out" id="encOut">
+      <div class="label" data-i18n="linkLabel"></div>
+      <div id="encLink"></div>
+      <button class="secondary" onclick="copyLink()" data-i18n="copyBtn"></button>
+    </div>
+  </div>
+
+  <!-- DECRYPT -->
+  <div class="panel" id="panelDec">
+    <div class="step active" id="decStep1">
+      <label data-i18n="decryptInput"></label>
+      <input id="decInput" type="text" autocomplete="off" />
+      <button onclick="doDecryptCheck()" data-i18n="decryptBtn"></button>
+    </div>
+
+    <div class="step" id="decStep2">
+      <label data-i18n="enterSecret"></label>
+      <input id="decSecret" type="text" autocomplete="off" />
+      <button onclick="doDecryptFinal()" data-i18n="confirmBtn"></button>
+      <button class="link" onclick="resetDecrypt()" data-i18n="backLink"></button>
+    </div>
+
+    <div class="msg" id="decMsg"></div>
+    <div class="out" id="decOut">
+      <div class="label" data-i18n="result"></div>
+      <div id="decOutText" class="out-text"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/i18n.js"></script>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
