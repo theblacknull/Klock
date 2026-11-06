@@ -39,12 +39,17 @@
     <label data-i18n="secret"></label>
     <input id="encSecret" type="text" autocomplete="off" />
     <label data-i18n="message"></label>
-    <textarea id="encMessage"></textarea>
-
-    <div class="fileRow">
-      <button type="button" class="secondary small" onclick="document.getElementById('encFile').click()" data-i18n="attachFile"></button>
-      <span id="encFileName" class="fileName"></span>
-      <button type="button" class="link small hidden" id="encFileClear" onclick="clearFile()" data-i18n="removeFile"></button>
+    <div class="msgWrap">
+      <textarea id="encMessage"></textarea>
+      <button type="button" class="fileIconBtn" id="attachBtn" onclick="document.getElementById('encFile').click()" title="Attach file">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21 10.5L12.5 19a4.5 4.5 0 01-6.36-6.36L14.5 4.28a3 3 0 014.24 4.24L10.4 17.17a1.5 1.5 0 01-2.12-2.12l7.07-7.07" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="fileChip hidden" id="encFileChip">
+        <span id="encFileChipName"></span>
+        <button type="button" class="fileChipClear" id="encFileClear" onclick="clearFile()" title="Remove">✕</button>
+      </div>
     </div>
     <input id="encFile" type="file" class="hidden" onchange="onFilePicked()" />
 
@@ -53,7 +58,7 @@
       <select id="encTz"></select>
       <input id="encTime" type="datetime-local" step="1" />
     </div>
-    <button onclick="doEncrypt()" data-i18n="encryptBtn"></button>
+    <button id="encBtn" onclick="doEncrypt()" data-i18n="encryptBtn"></button>
     <div class="msg" id="encMsg"></div>
     <div class="out" id="encOut">
       <div class="label" data-i18n="linkLabel"></div>
@@ -67,13 +72,13 @@
     <div class="step active" id="decStep1">
       <label data-i18n="decryptInput"></label>
       <input id="decInput" type="text" autocomplete="off" />
-      <button onclick="doDecryptCheck()" data-i18n="decryptBtn"></button>
+      <button id="decCheckBtn" onclick="doDecryptCheck()" data-i18n="decryptBtn"></button>
     </div>
 
     <div class="step" id="decStep2">
       <label data-i18n="enterSecret"></label>
       <input id="decSecret" type="text" autocomplete="off" />
-      <button onclick="doDecryptFinal()" data-i18n="confirmBtn"></button>
+      <button id="decFinalBtn" onclick="doDecryptFinal()" data-i18n="confirmBtn"></button>
       <button class="link" onclick="resetDecrypt()" data-i18n="backLink"></button>
     </div>
 

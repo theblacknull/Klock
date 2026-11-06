@@ -14,6 +14,12 @@ function pad(n, w) { return String(n).padStart(w, "0"); }
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
 let selectedFile = null; // File | null
 
+function truncateMiddle(name, max = 30) {
+  if (name.length <= max) return name;
+  const half = Math.floor((max - 1) / 2);
+  return name.slice(0, half) + "…" + name.slice(name.length - (max - 1 - half));
+}
+
 function onFilePicked() {
   const input = document.getElementById("encFile");
   const f = input.files && input.files[0];
@@ -25,16 +31,19 @@ function onFilePicked() {
     return;
   }
   selectedFile = f;
-  document.getElementById("encFileName").textContent = `${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
-  document.getElementById("encFileClear").classList.remove("hidden");
-  document.getElementById("encMessage").disabled = true;
+  document.getElementById("encFileChipName").textContent = truncateMiddle(f.name);
+  document.getElementById("encFileChip").classList.remove("hidden");
+  document.getElementById("attachBtn").classList.add("hidden");
+  const msgEl = document.getElementById("encMessage");
+  msgEl.value = "";
+  msgEl.disabled = true;
 }
 
 function clearFile() {
   selectedFile = null;
   document.getElementById("encFile").value = "";
-  document.getElementById("encFileName").textContent = "";
-  document.getElementById("encFileClear").classList.add("hidden");
+  document.getElementById("encFileChip").classList.add("hidden");
+  document.getElementById("attachBtn").classList.remove("hidden");
   document.getElementById("encMessage").disabled = false;
 }
 
@@ -136,7 +145,60 @@ function setMsg(id, text, bad) {
   el.className = "msg" + (bad ? " bad" : text ? " good" : "");
 }
 
+// ---- thanh tiến trình % trên nút: khóa nút lại, hiện % chạy tới 100% rồi mới cho bấm lại ----
+function startProgress(btn) {
+  btn.dataset.label = btn.textContent;
+  btn.disabled = true;
+  btn.classList.add("progress");
+  btn.innerHTML = '<span class="fill"></span><span class="pct">0%</span>';
+}
+
+function setProgress(btn, pct) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  const fill = btn.querySelector(".fill");
+  const label = btn.querySelector(".pct");
+  if (fill) fill.style.width = clamped + "%";
+  if (label) label.textContent = Math.round(clamped) + "%";
+}
+
+function endProgress(btn) {
+  btn.disabled = false;
+  btn.classList.remove("progress");
+  btn.textContent = btn.dataset.label || btn.textContent;
+}
+
+// giả lập tiến trình chạy dần tới gần `to` trong lúc chờ 1 bước không có tiến trình thật (vd Argon2id, time-lock)
+function creepProgress(btn, from, to, guessMs) {
+  setProgress(btn, from);
+  const start = performance.now();
+  const id = setInterval(() => {
+    const t = Math.min(0.94, (performance.now() - start) / guessMs);
+    setProgress(btn, from + (to - from) * t);
+  }, 80);
+  return () => clearInterval(id);
+}
+
+function postEncryptXHR(code, wrapped, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/encrypt");
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText)); }
+        catch { reject(new Error("bad response")); }
+      } else {
+        reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error("network error"));
+    xhr.send(JSON.stringify({ code, wrapped }));
+  });
+}
+
 async function doEncrypt() {
+  const btn = document.getElementById("encBtn");
   const secretEl = document.getElementById("encSecret");
   const msgEl = document.getElementById("encMessage");
   const timeEl = document.getElementById("encTime");
@@ -161,31 +223,39 @@ async function doEncrypt() {
   const x0 = randX0();
   const code = x0 + dateStr;
 
-  setMsg("encMsg", t("working"));
-  const payload = await buildEnvelope(message);
-  const secretBytes = enc.encode(secret);
-  const x0Bytes = enc.encode(x0);
-  const key = await deriveKey(secretBytes, x0Bytes);
-  const nonceBytes = await nonceOf(x0Bytes);
-  const aad = enc.encode(code);
-  const ct = await gcmEncrypt(key, nonceBytes, aad, payload);
-
-  secretEl.value = "";
-  msgEl.value = "";
-  clearFile();
-  setMsg("encMsg", "");
-
+  startProgress(btn);
   try {
-    const roundNumber = roundAt(unlockMs, defaultChainInfo);
-    const wrapped = await timelockEncrypt(roundNumber, Buffer.from(ct), drandClient);
+    setProgress(btn, 3);
+    const payload = await buildEnvelope(message);
+    setProgress(btn, 10);
 
-    const r = await fetch("/api/encrypt", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, wrapped }),
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
-    const { slug } = await r.json();
+    const secretBytes = enc.encode(secret);
+    const x0Bytes = enc.encode(x0);
+    let stop = creepProgress(btn, 10, 35, 500);
+    const key = await deriveKey(secretBytes, x0Bytes);
+    stop();
+    setProgress(btn, 35);
+
+    const nonceBytes = await nonceOf(x0Bytes);
+    const aad = enc.encode(code);
+    stop = creepProgress(btn, 35, 55, 400);
+    const ct = await gcmEncrypt(key, nonceBytes, aad, payload);
+    stop();
+    setProgress(btn, 55);
+
+    secretEl.value = "";
+    msgEl.value = "";
+    clearFile();
+
+    const roundNumber = roundAt(unlockMs, defaultChainInfo);
+    stop = creepProgress(btn, 55, 70, 400);
+    const wrapped = await timelockEncrypt(roundNumber, Buffer.from(ct), drandClient);
+    stop();
+    setProgress(btn, 70);
+
+    const { slug } = await postEncryptXHR(code, wrapped, (frac) => setProgress(btn, 70 + frac * 30));
+    setProgress(btn, 100);
+
     const link = location.origin + "/" + slug;
     document.getElementById("encLink").textContent = link;
     document.getElementById("encOut").classList.add("show");
@@ -193,6 +263,8 @@ async function doEncrypt() {
   } catch (e) {
     console.error("klock encrypt failed:", e);
     setMsg("encMsg", t("encryptErr") + " (" + e.message + ")", true);
+  } finally {
+    endProgress(btn);
   }
 }
 
@@ -233,47 +305,64 @@ function revokeDecObjectUrl() {
 }
 
 async function doDecryptCheck() {
+  const btn = document.getElementById("decCheckBtn");
   const input = document.getElementById("decInput").value;
   const slug = extractSlug(input);
   document.getElementById("decOut").classList.remove("show");
   setMsg("decMsg", "");
   if (!/^[A-Za-z0-9]{6}$/.test(slug)) { goStep(1); return setMsg("decMsg", t("notDecrypted"), true); }
 
+  startProgress(btn);
   try {
+    setProgress(btn, 10);
     const r = await fetch("/api/item/" + slug);
     if (!r.ok) { goStep(1); return setMsg("decMsg", t("notDecrypted"), true); }
+    setProgress(btn, 35);
     const { code, wrapped } = await r.json();
     let plainWrapped;
+    const stop = creepProgress(btn, 35, 95, 1500); // thời gian mạng tới drand không biết trước
     try {
       plainWrapped = await timelockDecrypt(wrapped, drandClient); // ném lỗi nếu chưa tới giờ
     } catch (e) {
+      stop();
       const locked = /too early/i.test(e.message || "");
       goStep(1);
       return setMsg("decMsg", locked ? t("notDecrypted") : t("networkErr"), true);
     }
+    stop();
+    setProgress(btn, 100);
     pending = { code, ct: new Uint8Array(plainWrapped) };
     setMsg("decMsg", "");
     goStep(2);
   } catch (e) {
     goStep(1);
     setMsg("decMsg", t("networkErr"), true);
+  } finally {
+    endProgress(btn);
   }
 }
 
 async function doDecryptFinal() {
+  const btn = document.getElementById("decFinalBtn");
   const secretEl = document.getElementById("decSecret");
   if (!pending) return;
   const { code, ct } = pending;
   const x0 = code.slice(0, code.length - 14);
   const secretBytes = enc.encode(secretEl.value);
   secretEl.value = "";
-  setMsg("decMsg", t("working"));
+  startProgress(btn);
   const x0Bytes = enc.encode(x0);
+  let stop = creepProgress(btn, 0, 70, 500);
   const key = await deriveKey(secretBytes, x0Bytes);
+  stop();
+  setProgress(btn, 70);
   const nonceBytes = await nonceOf(x0Bytes);
   const aad = enc.encode(code);
   try {
+    stop = creepProgress(btn, 70, 95, 400);
     const pt = await gcmDecrypt(key, nonceBytes, aad, ct);
+    stop();
+    setProgress(btn, 100);
     const envelope = parseEnvelope(pt);
     revokeDecObjectUrl();
     const textEl = document.getElementById("decOutText");
@@ -305,6 +394,8 @@ async function doDecryptFinal() {
   } catch (e) {
     document.getElementById("decOut").classList.remove("show");
     setMsg("decMsg", t("notDecrypted"), true);
+  } finally {
+    endProgress(btn);
   }
 }
 
