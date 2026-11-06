@@ -35,7 +35,8 @@ Type=simple
 User=www-data
 WorkingDirectory=/opt/klock/web
 Environment=KLOCK_ADDR=127.0.0.1:8787
-Environment=KLOCK_DB=/opt/klock/web/klock_web_data.json
+Environment=KLOCK_DB=/opt/klock/web/klock_data
+# KLOCK_DB là một THƯ MỤC (mỗi link 1 file bên trong), không phải tên file — tự tạo nếu chưa có.
 Environment=KLOCK_STATIC=/opt/klock/web/static
 ExecStart=/opt/klock/web/target/release/klock-web
 Restart=on-failure
