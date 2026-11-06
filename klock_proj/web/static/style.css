@@ -241,6 +241,12 @@ button.link:active { transform: none; }
 }
 .out.show { display: block; animation: fade .3s ease; }
 .out .label { font-size: 11px; color: var(--good); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+#encFileOut + #encOut { margin-top: 10px; }
+.btnWhite {
+  background: #ffffff; color: #0a0b12; border: none;
+  box-shadow: 0 10px 24px -10px rgba(255, 255, 255, 0.35);
+}
+.btnWhite:hover { filter: brightness(0.94); }
 #encLink, #decOut.out-text {
   word-break: break-all; font-size: 13px; font-family: 'JetBrains Mono', monospace;
   color: var(--txt); line-height: 1.5;

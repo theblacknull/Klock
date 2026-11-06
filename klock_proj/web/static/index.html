@@ -74,15 +74,17 @@
     </div>
     <button id="encBtn" onclick="doEncrypt()" data-i18n="encryptBtn"></button>
     <div class="msg" id="encMsg"></div>
-    <div class="out" id="encOut">
+    <div class="out" id="encFileOut">
       <div class="label" data-i18n="fileLabel"></div>
-      <a id="encFileDownload" class="secondary btnlike" download>
+      <a id="encFileDownload" class="btnWhite btnlike" download>
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <span data-i18n="downloadFile"></span>
       </a>
-      <div class="label linkLabelSpaced" data-i18n="linkLabel"></div>
+    </div>
+    <div class="out" id="encOut">
+      <div class="label" data-i18n="linkLabel"></div>
       <div id="encLink"></div>
       <div class="btnRow">
         <button class="secondary" onclick="copyLink()" data-i18n="copyBtn"></button>
@@ -125,7 +127,7 @@
       <div id="decOutFile" class="hidden">
         <img id="decOutImg" class="hidden" />
         <div id="decOutFileName" class="fileName"></div>
-        <a id="decOutDownload" class="secondary btnlike" download>
+        <a id="decOutDownload" class="secondary btnlike" download onclick="notifyDownloaded()">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>

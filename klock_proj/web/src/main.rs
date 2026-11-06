@@ -78,7 +78,7 @@ async fn encrypt(
     while app.store.contains(&slug) {
         slug = gen_slug();
     }
-    app.store.insert(&slug, req.code, req.wrapped);
+    app.store.insert(&slug, req.code, req.wrapped, false);
     Json(EncryptResp { slug }).into_response()
 }
 
@@ -86,6 +86,15 @@ async fn item(State(app): State<Arc<App>>, Path(slug): Path<String>) -> impl Int
     match app.store.get_and_touch(&slug) {
         Some(r) => Json(r).into_response(),
         None => (StatusCode::NOT_FOUND, "không tìm thấy").into_response(),
+    }
+}
+
+/// Người dùng vừa tải xong nội dung đã giải mã — rút ngắn thời gian lưu còn 5 phút.
+async fn downloaded(State(app): State<Arc<App>>, Path(slug): Path<String>) -> impl IntoResponse {
+    if app.store.mark_downloaded(&slug) {
+        StatusCode::OK
+    } else {
+        StatusCode::NOT_FOUND
     }
 }
 
@@ -134,6 +143,7 @@ async fn main() {
     let router = Router::new()
         .route("/api/encrypt", post(encrypt))
         .route("/api/item/:slug", get(item))
+        .route("/api/item/:slug/downloaded", post(downloaded))
         .layer(DefaultBodyLimit::max(MAX_WRAPPED_BYTES as usize + 4096))
         .fallback(spa_fallback)
         .with_state(app);

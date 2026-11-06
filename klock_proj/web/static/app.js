@@ -239,6 +239,7 @@ async function doEncrypt() {
   const message = msgEl.value;
   setMsg("encMsg", "");
   document.getElementById("encOut").classList.remove("show");
+  document.getElementById("encFileOut").classList.remove("show");
 
   if (!timeEl.value) return setMsg("encMsg", t("future"), true);
   const [datePart, timePart] = timeEl.value.split("T");
@@ -301,6 +302,7 @@ async function doEncrypt() {
     const link = location.origin + "/" + slug;
     document.getElementById("encLink").textContent = link;
     document.getElementById("encOut").classList.add("show");
+    document.getElementById("encFileOut").classList.add("show");
     document.getElementById("shareBtn").classList.toggle("hidden", !navigator.share);
     window.__lastLink = link;
   } catch (e) {
@@ -324,6 +326,13 @@ function shareLink() {
 }
 
 let pending = null; // { code, wrapped } — tạm trong RAM, không lưu đĩa
+let currentSlug = null; // slug đang xem (null nếu giải mã từ file tải lên, không qua server)
+
+function notifyDownloaded() {
+  if (currentSlug) {
+    fetch("/api/item/" + currentSlug + "/downloaded", { method: "POST" }).catch(() => {});
+  }
+}
 
 function extractSlug(input) {
   const s = input.trim();
@@ -338,6 +347,7 @@ function goStep(n) {
 
 function resetDecrypt() {
   pending = null;
+  currentSlug = null;
   clearDecFile();
   document.getElementById("decInput").value = "";
   document.getElementById("decOut").classList.remove("show");
@@ -361,12 +371,14 @@ async function doDecryptCheck() {
   setMsg("decMsg", "");
 
   let code, wrapped;
+  currentSlug = null;
   if (decFilePayload) {
     // dữ liệu lấy thẳng từ file người dùng tải lên — không cần hỏi server
     ({ code, wrapped } = decFilePayload);
   } else {
     const slug = extractSlug(document.getElementById("decInput").value);
     if (!/^[A-Za-z0-9]{6}$/.test(slug)) { goStep(1); return setMsg("decMsg", t("notDecrypted"), true); }
+    currentSlug = slug;
     startProgress(btn);
     setProgress(btn, 10);
     const r = await fetch("/api/item/" + slug);
@@ -468,6 +480,7 @@ window.resetDecrypt = resetDecrypt;
 window.onFilePicked = onFilePicked;
 window.clearFile = clearFile;
 window.onDecFilePicked = onDecFilePicked;
+window.notifyDownloaded = notifyDownloaded;
 window.clearDecFile = clearDecFile;
 window.toggleInfo = () => document.getElementById("infoPanel").classList.toggle("hidden");
 
