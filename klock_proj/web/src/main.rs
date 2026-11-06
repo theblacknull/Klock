@@ -1,3 +1,4 @@
+mod payment;
 mod ratelimit;
 mod store;
 
@@ -98,6 +99,50 @@ async fn downloaded(State(app): State<Arc<App>>, Path(slug): Path<String>) -> im
     }
 }
 
+#[derive(Deserialize)]
+struct ConfirmPaymentReq {
+    network: String,
+    tx_hash: String,
+}
+
+#[derive(Serialize)]
+struct ConfirmPaymentResp {
+    ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+/// Client tự dò thấy 1 giao dịch ~1 USDT trên blockchain công khai trước; server ở đây LUÔN
+/// tự kiểm tra lại trực tiếp trên chain (không tin số liệu client gửi lên) trước khi mở khóa lưu vĩnh viễn.
+async fn confirm_payment(
+    State(app): State<Arc<App>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+    Json(req): Json<ConfirmPaymentReq>,
+) -> impl IntoResponse {
+    if !app.encrypt_limiter.allow(client_ip(&headers, addr)) {
+        return (StatusCode::TOO_MANY_REQUESTS, Json(ConfirmPaymentResp { ok: false, error: Some("quá nhiều yêu cầu".into()) })).into_response();
+    }
+    if !app.store.contains(&slug) {
+        return (StatusCode::NOT_FOUND, Json(ConfirmPaymentResp { ok: false, error: Some("không tìm thấy".into()) })).into_response();
+    }
+    let Some(network) = payment::network_for(&req.network) else {
+        return (StatusCode::BAD_REQUEST, Json(ConfirmPaymentResp { ok: false, error: Some("mạng không hỗ trợ".into()) })).into_response();
+    };
+    match payment::verify_tx(&network, &req.tx_hash).await {
+        Ok(true) => {
+            if !app.store.claim_tx(&req.tx_hash) {
+                return (StatusCode::CONFLICT, Json(ConfirmPaymentResp { ok: false, error: Some("giao dịch đã được dùng".into()) })).into_response();
+            }
+            app.store.set_permanent(&slug);
+            Json(ConfirmPaymentResp { ok: true, error: None }).into_response()
+        }
+        Ok(false) => (StatusCode::OK, Json(ConfirmPaymentResp { ok: false, error: Some("chưa tìm thấy giao dịch hợp lệ".into()) })).into_response(),
+        Err(e) => (StatusCode::BAD_GATEWAY, Json(ConfirmPaymentResp { ok: false, error: Some(e) })).into_response(),
+    }
+}
+
 /// Phục vụ file tĩnh; nếu không khớp file nào (vd link dạng /ABC123) thì trả về index.html
 /// với mã 200 (SPA fallback đúng nghĩa) thay vì 404, để trang luôn tải và chạy JS bình thường.
 async fn spa_fallback(State(app): State<Arc<App>>, req: Request<Body>) -> axum::response::Response {
@@ -144,6 +189,7 @@ async fn main() {
         .route("/api/encrypt", post(encrypt))
         .route("/api/item/:slug", get(item))
         .route("/api/item/:slug/downloaded", post(downloaded))
+        .route("/api/item/:slug/confirm-payment", post(confirm_payment))
         .layer(DefaultBodyLimit::max(MAX_WRAPPED_BYTES as usize + 4096))
         .fallback(spa_fallback)
         .with_state(app);

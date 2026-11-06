@@ -72,6 +72,28 @@
       <select id="encTz"></select>
       <input id="encTime" type="datetime-local" step="1" />
     </div>
+    <div class="toggleRow">
+      <span>Save encrypted file on server forever</span>
+      <button type="button" class="switch" id="permSwitch" onclick="togglePermanent()" role="switch" aria-checked="false"><span class="knob"></span></button>
+    </div>
+    <div class="payBox hidden" id="payBox">
+      <div class="payAmount">1 USDT</div>
+      <div class="payRow" data-net="bsc">
+        <div class="payInfo">
+          <span class="payNet">BSC</span>
+          <span class="payAddr" onclick="copyPayAddr(this)">0xb11be01e0d81b20f373aa0de7058946765e68d97</span>
+        </div>
+        <button type="button" class="paidBtn" onclick="checkPayment('bsc')">Paid</button>
+      </div>
+      <div class="payRow" data-net="eth">
+        <div class="payInfo">
+          <span class="payNet">ETH</span>
+          <span class="payAddr" onclick="copyPayAddr(this)">0xb11be01e0d81b20f373aa0de7058946765e68d97</span>
+        </div>
+        <button type="button" class="paidBtn" onclick="checkPayment('eth')">Paid</button>
+      </div>
+      <div class="payStatus" id="payStatus"></div>
+    </div>
     <button id="encBtn" onclick="doEncrypt()" data-i18n="encryptBtn"></button>
     <div class="msg" id="encMsg"></div>
     <div class="out" id="encFileOut">

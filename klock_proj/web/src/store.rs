@@ -62,6 +62,27 @@ impl Store {
         self.dir.join(format!("{slug}.json"))
     }
 
+    fn used_tx_path(&self) -> PathBuf {
+        self.dir.join("_used_tx.json")
+    }
+
+    /// Đánh dấu 1 hash giao dịch đã được dùng để mở khóa lưu vĩnh viễn.
+    /// Trả về true nếu đây là lần đầu dùng (hợp lệ), false nếu đã dùng rồi (chặn tái sử dụng).
+    pub fn claim_tx(&self, tx_hash: &str) -> bool {
+        let p = self.used_tx_path();
+        let mut set: std::collections::HashSet<String> = std::fs::read_to_string(&p)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
+        if !set.insert(tx_hash.to_lowercase()) {
+            return false;
+        }
+        if let Ok(s) = serde_json::to_string(&set) {
+            let _ = std::fs::write(&p, s);
+        }
+        true
+    }
+
     pub fn contains(&self, slug: &str) -> bool {
         self.path(slug).exists()
     }

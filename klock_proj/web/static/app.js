@@ -305,6 +305,8 @@ async function doEncrypt() {
     document.getElementById("encFileOut").classList.add("show");
     document.getElementById("shareBtn").classList.toggle("hidden", !navigator.share);
     window.__lastLink = link;
+    window.__lastEncSlug = slug;
+    document.getElementById("payStatus").textContent = "";
   } catch (e) {
     console.error("klock encrypt failed:", e);
     setMsg("encMsg", t("encryptErr") + " (" + e.message + ")", true);
@@ -483,6 +485,107 @@ window.onDecFilePicked = onDecFilePicked;
 window.notifyDownloaded = notifyDownloaded;
 window.clearDecFile = clearDecFile;
 window.toggleInfo = () => document.getElementById("infoPanel").classList.toggle("hidden");
+
+// ---- lưu vĩnh viễn trả phí (1 USDT qua BSC hoặc ETH) ----
+const TREASURY_EVM = "0xb11be01e0d81b20f373aa0de7058946765e68d97";
+const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const PAY_NETWORKS = {
+  bsc: { rpc: "https://bsc-rpc.publicnode.com", usdt: "0x55d398326f99059ff775485246999027b3197955", decimals: 18, lookback: 150 },
+  eth: { rpc: "https://ethereum-rpc.publicnode.com", usdt: "0xdac17f958d2ee523a2206206994597c13d831ec7", decimals: 6, lookback: 40 },
+};
+
+function togglePermanent() {
+  const sw = document.getElementById("permSwitch");
+  const on = !sw.classList.contains("on");
+  sw.classList.toggle("on", on);
+  sw.setAttribute("aria-checked", String(on));
+  document.getElementById("payBox").classList.toggle("hidden", !on);
+}
+
+function copyPayAddr(el) {
+  navigator.clipboard.writeText(el.textContent.trim()).catch(() => {});
+}
+
+async function rpcCall(rpc, method, params) {
+  const r = await fetch(rpc, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || "rpc error");
+  return j.result;
+}
+
+function topicAddr(addr) { return "0x" + addr.replace(/^0x/, "").toLowerCase().padStart(64, "0"); }
+
+// Client tự dò trên RPC công khai trước (không tốn tài nguyên server); server vẫn tự
+// xác minh lại độc lập trước khi mở khóa lưu vĩnh viễn — không tin kết quả này.
+async function findPaymentTx(net) {
+  const cfg = PAY_NETWORKS[net];
+  const latest = parseInt(await rpcCall(cfg.rpc, "eth_blockNumber", []), 16);
+  const fromBlock = "0x" + Math.max(0, latest - cfg.lookback).toString(16);
+  const logs = await rpcCall(cfg.rpc, "eth_getLogs", [{
+    fromBlock, toBlock: "latest", address: cfg.usdt,
+    topics: [TRANSFER_TOPIC, null, topicAddr(TREASURY_EVM)],
+  }]);
+  const want = 10n ** BigInt(cfg.decimals);
+  const tol = 100000n;
+  for (const log of logs) {
+    if (BigInt(log.data) + tol >= want) return log.transactionHash;
+  }
+  return null;
+}
+
+async function checkPayment(net) {
+  const statusEl = document.getElementById("payStatus");
+  if (!window.__lastEncSlug) {
+    statusEl.className = "payStatus bad";
+    statusEl.textContent = "Encrypt first.";
+    return;
+  }
+  const btns = document.querySelectorAll(".paidBtn");
+  btns.forEach((b) => (b.disabled = true));
+  statusEl.className = "payStatus";
+  statusEl.textContent = "Checking blockchain…";
+
+  const deadline = Date.now() + 5 * 60000;
+  let found = null;
+  while (Date.now() < deadline && !found) {
+    try { found = await findPaymentTx(net); } catch (e) { /* thử lại ở vòng sau */ }
+    if (!found) await new Promise((r) => setTimeout(r, 10000));
+  }
+  if (!found) {
+    statusEl.className = "payStatus bad";
+    statusEl.textContent = "Payment not found, try again.";
+    btns.forEach((b) => (b.disabled = false));
+    return;
+  }
+
+  statusEl.textContent = "Confirming…";
+  try {
+    const r = await fetch(`/api/item/${window.__lastEncSlug}/confirm-payment`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ network: net, tx_hash: found }),
+    });
+    const j = await r.json();
+    if (j.ok) {
+      statusEl.className = "payStatus good";
+      statusEl.textContent = "Confirmed — stored forever.";
+    } else {
+      statusEl.className = "payStatus bad";
+      statusEl.textContent = j.error || "Failed.";
+      btns.forEach((b) => (b.disabled = false));
+    }
+  } catch (e) {
+    statusEl.className = "payStatus bad";
+    statusEl.textContent = "Network error.";
+    btns.forEach((b) => (b.disabled = false));
+  }
+}
+
+window.togglePermanent = togglePermanent;
+window.copyPayAddr = copyPayAddr;
+window.checkPayment = checkPayment;
 
 (function init() {
   applyLang();
