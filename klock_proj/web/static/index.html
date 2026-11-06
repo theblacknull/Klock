@@ -98,7 +98,7 @@
     <div class="msg" id="encMsg"></div>
     <div class="out" id="encFileOut">
       <div class="label" data-i18n="fileLabel"></div>
-      <a id="encFileDownload" class="btnWhite btnlike" download>
+      <a id="encFileDownload" class="btnWhite btnlike" download onclick="markEncConsumed()">
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -152,7 +152,7 @@
       <div id="decOutFile" class="hidden">
         <img id="decOutImg" class="hidden" />
         <div id="decOutFileName" class="fileName"></div>
-        <a id="decOutDownload" class="secondary btnlike" download onclick="notifyDownloaded()">
+        <a id="decOutDownload" class="secondary btnlike" download onclick="notifyDownloaded(); markDecConsumed()">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>

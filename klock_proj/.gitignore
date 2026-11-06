@@ -3,4 +3,6 @@
 web/.env
 web/klock_web_data.json
 web/klock_data/
+web/bot/node_modules/
+web/bot/.env
 *.pdb

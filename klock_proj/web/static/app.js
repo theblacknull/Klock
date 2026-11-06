@@ -165,7 +165,17 @@ async function gcmDecrypt(keyBytes, nonceBytes, aadBytes, ctBytes) {
   return new Uint8Array(out);
 }
 
+// ---- giữ/làm mới dữ liệu khi chuyển tab: chỉ reset nếu người dùng đã lấy được kết quả
+// (download/copy link bên mã hóa; download file hoặc đã xem tin nhắn bên giải mã) ----
+let encConsumed = false;
+let decConsumed = false;
+
+function markEncConsumed() { encConsumed = true; }
+function markDecConsumed() { decConsumed = true; }
+
 function showTab(which) {
+  if (which === "enc" && encConsumed) resetEncrypt();
+  if (which === "dec" && decConsumed) resetDecrypt();
   document.getElementById("panelEnc").classList.toggle("active", which === "enc");
   document.getElementById("panelDec").classList.toggle("active", which === "dec");
   document.getElementById("tabEncBtn").classList.toggle("active", which === "enc");
@@ -341,13 +351,45 @@ function copyLink() {
       el.classList.add("show");
       clearTimeout(window.__copyStatusTimer);
       window.__copyStatusTimer = setTimeout(() => el.classList.remove("show"), 1500);
+      markEncConsumed();
     });
   }
 }
 
 function shareLink() {
   if (window.__lastLink && navigator.share) {
-    navigator.share({ url: window.__lastLink }).catch(() => {});
+    navigator.share({ url: window.__lastLink }).then(markEncConsumed).catch(() => {});
+  }
+}
+
+// Đặt lại toàn bộ form mã hóa về trạng thái ban đầu (unlock time cập nhật mới) — chỉ gọi
+// khi người dùng đã lấy được kết quả trước đó (download file hoặc copy/share link).
+function resetEncrypt() {
+  encConsumed = false;
+  document.getElementById("encOut").classList.remove("show");
+  document.getElementById("encFileOut").classList.remove("show");
+  document.getElementById("copyStatus").classList.remove("show");
+  document.getElementById("encSecret").value = "";
+  document.getElementById("encMessage").value = "";
+  clearFile();
+  setMsg("encMsg", "");
+  const sw = document.getElementById("permSwitch");
+  if (sw && sw.classList.contains("on")) {
+    sw.classList.remove("on");
+    sw.setAttribute("aria-checked", "false");
+    document.getElementById("payBox").classList.add("hidden");
+  }
+  document.getElementById("payStatus").textContent = "";
+  window.__lastLink = null;
+  window.__lastEncSlug = null;
+  if (window.__encFileUrl) {
+    URL.revokeObjectURL(window.__encFileUrl);
+    window.__encFileUrl = null;
+  }
+  const def = document.getElementById("encTime");
+  if (def) {
+    const nt = new Date(Date.now() + 60000);
+    def.value = `${nt.getFullYear()}-${pad(nt.getMonth() + 1, 2)}-${pad(nt.getDate(), 2)}T${pad(nt.getHours(), 2)}:${pad(nt.getMinutes(), 2)}:${pad(nt.getSeconds(), 2)}`;
   }
 }
 
@@ -374,6 +416,7 @@ function goStep(n) {
 function resetDecrypt() {
   pending = null;
   currentSlug = null;
+  decConsumed = false;
   clearDecFile();
   document.getElementById("decInput").value = "";
   document.getElementById("decOut").classList.remove("show");
@@ -485,6 +528,7 @@ async function doDecryptFinal() {
       fileBox.classList.add("hidden");
       textEl.classList.remove("hidden");
       textEl.textContent = envelope.text;
+      markDecConsumed(); // tin nhắn văn bản coi như đã "xem" ngay khi hiện ra
     }
     document.getElementById("decOut").classList.add("show");
     setMsg("decMsg", "");
@@ -508,6 +552,8 @@ window.clearFile = clearFile;
 window.onDecFilePicked = onDecFilePicked;
 window.notifyDownloaded = notifyDownloaded;
 window.clearDecFile = clearDecFile;
+window.markEncConsumed = markEncConsumed;
+window.markDecConsumed = markDecConsumed;
 window.toggleInfo = () => document.getElementById("infoPanel").classList.toggle("hidden");
 
 // ---- lưu vĩnh viễn trả phí (1 USDT qua BSC hoặc ETH) ----
@@ -626,4 +672,13 @@ window.checkPayment = checkPayment;
     document.getElementById("decInput").value = location.href;
     doDecryptCheck();
   }
+
+  // Phím tắt E = tab Mã hóa, D = tab Giải mã — bỏ qua khi người dùng đang gõ vào 1 ô nhập liệu
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select" || e.target.isContentEditable) return;
+    if (e.key === "e" || e.key === "E") showTab("enc");
+    else if (e.key === "d" || e.key === "D") showTab("dec");
+  });
 })();
