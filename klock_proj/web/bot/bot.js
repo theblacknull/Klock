@@ -97,9 +97,10 @@ const I18N = {
     decryptedResult: "✅ Result:\n\n{text}",
     fileTooLarge: "File too large (limit ~19MB over Telegram).",
     cancelled: "Cancelled. /start to begin again.",
+    cleared: "🧹 Chat cleared.",
     chooseLang: "🌐 Choose your language:", langSet: "✅ Language set to English.",
     genericError: "⚠️ Error: {err}", fileDownloadErr: "Could not download the file.",
-    helpText: "📘 <b>How to use</b>\n🔒 /encrypt — password, content/file, unlock time → get a link + .json file.\n🔓 /decrypt — send the link or .json file, then the password (after unlock time).\n🌐 /lang — change language.\n❌ /cancel — cancel the current step.\nFiles up to ~19MB.",
+    helpText: "📘 <b>How to use</b>\n🔒 /encrypt — password, content/file, unlock time → get a link + .json file.\n🔓 /decrypt — send the link or .json file, then the password (after unlock time).\n🌐 /lang — change language.\n🧹 /clear — delete this chat's messages.\n❌ /cancel — cancel the current step.\nFiles up to ~19MB.",
   },
   vi: {
     start: "<blockquote>🔐 <b>Klock</b>\nTôi là trợ lý bảo vệ dữ liệu cho bạn, chống lại máy tính lượng tử và các siêu máy tính. Để giải mã được file của tôi cần thời gian và khóa bí mật!</blockquote>\n\nChọn thao tác:",
@@ -128,9 +129,10 @@ const I18N = {
     decryptedResult: "✅ Kết quả:\n\n{text}",
     fileTooLarge: "File quá lớn (giới hạn ~19MB qua Telegram).",
     cancelled: "Đã hủy. /start để bắt đầu lại.",
+    cleared: "🧹 Đã xóa đoạn chat.",
     chooseLang: "🌐 Chọn ngôn ngữ:", langSet: "✅ Đã đổi ngôn ngữ sang Tiếng Việt.",
     genericError: "⚠️ Lỗi: {err}", fileDownloadErr: "Không tải được file.",
-    helpText: "📘 <b>Hướng dẫn sử dụng</b>\n🔒 /encrypt — mật khẩu, nội dung/file, thời gian mở khóa → nhận link + file .json.\n🔓 /decrypt — gửi link hoặc file .json, rồi mật khẩu (sau khi tới giờ mở khóa).\n🌐 /lang — đổi ngôn ngữ.\n❌ /cancel — hủy bước đang làm.\nFile tối đa ~19MB.",
+    helpText: "📘 <b>Hướng dẫn sử dụng</b>\n🔒 /encrypt — mật khẩu, nội dung/file, thời gian mở khóa → nhận link + file .json.\n🔓 /decrypt — gửi link hoặc file .json, rồi mật khẩu (sau khi tới giờ mở khóa).\n🌐 /lang — đổi ngôn ngữ.\n🧹 /clear — xóa tin nhắn trong đoạn chat.\n❌ /cancel — hủy bước đang làm.\nFile tối đa ~19MB.",
   },
   ru: {
     start: "<blockquote>🔐 <b>Klock</b>\nЯ ваш помощник по защите данных, устойчивый к квантовым компьютерам и суперкомпьютерам. Для расшифровки файла нужны время и секретный ключ!</blockquote>\n\nВыберите действие:",
@@ -159,9 +161,10 @@ const I18N = {
     decryptedResult: "✅ Результат:\n\n{text}",
     fileTooLarge: "Файл слишком большой (лимит Telegram ~19МБ).",
     cancelled: "Отменено. /start чтобы начать снова.",
+    cleared: "🧹 Чат очищен.",
     chooseLang: "🌐 Выберите язык:", langSet: "✅ Язык изменён на русский.",
     genericError: "⚠️ Ошибка: {err}", fileDownloadErr: "Не удалось скачать файл.",
-    helpText: "📘 <b>Как использовать</b>\n🔒 /encrypt — пароль, текст/файл, время разблокировки → ссылка + .json файл.\n🔓 /decrypt — отправьте ссылку или .json файл, затем пароль (после разблокировки).\n🌐 /lang — сменить язык.\n❌ /cancel — отменить текущий шаг.\nФайлы до ~19МБ.",
+    helpText: "📘 <b>Как использовать</b>\n🔒 /encrypt — пароль, текст/файл, время разблокировки → ссылка + .json файл.\n🔓 /decrypt — отправьте ссылку или .json файл, затем пароль (после разблокировки).\n🌐 /lang — сменить язык.\n🧹 /clear — удалить сообщения этого чата.\n❌ /cancel — отменить текущий шаг.\nФайлы до ~19МБ.",
   },
   zh: {
     start: "<blockquote>🔐 <b>Klock</b>\n我是你的数据保护助手,能抵御量子计算机和超级计算机。解密文件需要时间和密钥!</blockquote>\n\n请选择操作:",
@@ -190,9 +193,10 @@ const I18N = {
     decryptedResult: "✅ 结果:\n\n{text}",
     fileTooLarge: "文件过大(Telegram 限制约19MB)。",
     cancelled: "已取消。发送 /start 重新开始。",
+    cleared: "🧹 聊天已清空。",
     chooseLang: "🌐 选择语言:", langSet: "✅ 语言已切换为中文。",
     genericError: "⚠️ 出错: {err}", fileDownloadErr: "无法下载文件。",
-    helpText: "📘 <b>使用说明</b>\n🔒 /encrypt — 密码、内容/文件、解锁时间 → 获得链接 + .json 文件。\n🔓 /decrypt — 发送链接或 .json 文件,然后输入密码(解锁后)。\n🌐 /lang — 更改语言。\n❌ /cancel — 取消当前步骤。\n文件最大约19MB。",
+    helpText: "📘 <b>使用说明</b>\n🔒 /encrypt — 密码、内容/文件、解锁时间 → 获得链接 + .json 文件。\n🔓 /decrypt — 发送链接或 .json 文件,然后输入密码(解锁后)。\n🌐 /lang — 更改语言。\n🧹 /clear — 删除此聊天的消息。\n❌ /cancel — 取消当前步骤。\n文件最大约19MB。",
   },
   es: {
     start: "<blockquote>🔐 <b>Klock</b>\nSoy tu asistente de protección de datos, resistente a ordenadores cuánticos y superordenadores. Descifrar un archivo necesita tiempo y una clave secreta!</blockquote>\n\nElige una acción:",
@@ -221,20 +225,21 @@ const I18N = {
     decryptedResult: "✅ Resultado:\n\n{text}",
     fileTooLarge: "Archivo demasiado grande (límite ~19MB).",
     cancelled: "Cancelado. /start para empezar de nuevo.",
+    cleared: "🧹 Chat borrado.",
     chooseLang: "🌐 Elige tu idioma:", langSet: "✅ Idioma cambiado a español.",
     genericError: "⚠️ Error: {err}", fileDownloadErr: "No se pudo descargar el archivo.",
-    helpText: "📘 <b>Cómo usarlo</b>\n🔒 /encrypt — contraseña, contenido/archivo, hora de desbloqueo → enlace + archivo .json.\n🔓 /decrypt — envía el enlace o el archivo .json, luego la contraseña (tras desbloquear).\n🌐 /lang — cambiar idioma.\n❌ /cancel — cancelar el paso actual.\nArchivos hasta ~19MB.",
+    helpText: "📘 <b>Cómo usarlo</b>\n🔒 /encrypt — contraseña, contenido/archivo, hora de desbloqueo → enlace + archivo .json.\n🔓 /decrypt — envía el enlace o el archivo .json, luego la contraseña (tras desbloquear).\n🌐 /lang — cambiar idioma.\n🧹 /clear — borrar los mensajes de este chat.\n❌ /cancel — cancelar el paso actual.\nArchivos hasta ~19MB.",
   },
 };
 
 // Mô tả lệnh hiển thị trong menu (nút "/") của Telegram, theo từng ngôn ngữ đã chọn
 // — đặt riêng theo scope "chat" cho mỗi chatId, vì setMyCommands không nhận {key} nội suy.
 const COMMAND_I18N = {
-  en: { start: "Open the Klock menu", encrypt: "Encrypt a message/file with a time-lock", decrypt: "Decrypt a link or received file", lang: "Change language", help: "How to use this bot", cancel: "Cancel the current operation" },
-  vi: { start: "Mở menu Klock", encrypt: "Mã hóa tin nhắn/file theo thời gian", decrypt: "Giải mã link hoặc file đã nhận", lang: "Đổi ngôn ngữ", help: "Hướng dẫn sử dụng bot", cancel: "Hủy thao tác hiện tại" },
-  ru: { start: "Открыть меню Klock", encrypt: "Зашифровать сообщение/файл с таймлоком", decrypt: "Расшифровать ссылку или файл", lang: "Сменить язык", help: "Как использовать бота", cancel: "Отменить текущую операцию" },
-  zh: { start: "打开 Klock 菜单", encrypt: "按时间锁加密消息/文件", decrypt: "解密链接或收到的文件", lang: "更改语言", help: "使用说明", cancel: "取消当前操作" },
-  es: { start: "Abrir el menú de Klock", encrypt: "Cifrar un mensaje/archivo con bloqueo temporal", decrypt: "Descifrar un enlace o archivo recibido", lang: "Cambiar idioma", help: "Cómo usar este bot", cancel: "Cancelar la operación actual" },
+  en: { start: "Open the Klock menu", encrypt: "Encrypt a message/file with a time-lock", decrypt: "Decrypt a link or received file", lang: "Change language", help: "How to use this bot", clear: "Delete this chat's messages", cancel: "Cancel the current operation" },
+  vi: { start: "Mở menu Klock", encrypt: "Mã hóa tin nhắn/file theo thời gian", decrypt: "Giải mã link hoặc file đã nhận", lang: "Đổi ngôn ngữ", help: "Hướng dẫn sử dụng bot", clear: "Xóa tin nhắn trong đoạn chat", cancel: "Hủy thao tác hiện tại" },
+  ru: { start: "Открыть меню Klock", encrypt: "Зашифровать сообщение/файл с таймлоком", decrypt: "Расшифровать ссылку или файл", lang: "Сменить язык", help: "Как использовать бота", clear: "Удалить сообщения этого чата", cancel: "Отменить текущую операцию" },
+  zh: { start: "打开 Klock 菜单", encrypt: "按时间锁加密消息/文件", decrypt: "解密链接或收到的文件", lang: "更改语言", help: "使用说明", clear: "删除此聊天的消息", cancel: "取消当前操作" },
+  es: { start: "Abrir el menú de Klock", encrypt: "Cifrar un mensaje/archivo con bloqueo temporal", decrypt: "Descifrar un enlace o archivo recibido", lang: "Cambiar idioma", help: "Cómo usar este bot", clear: "Borrar los mensajes de este chat", cancel: "Cancelar la operación actual" },
 };
 
 function applyCommandsForChat(chatId) {
@@ -246,6 +251,7 @@ function applyCommandsForChat(chatId) {
       { command: "decrypt", description: c.decrypt },
       { command: "lang", description: c.lang },
       { command: "help", description: c.help },
+      { command: "clear", description: c.clear },
       { command: "cancel", description: c.cancel },
     ],
     { scope: { type: "chat", chat_id: chatId } }
@@ -448,6 +454,7 @@ bot.setMyCommands([
   { command: "decrypt", description: "Decrypt a link or received file" },
   { command: "lang", description: "Change language" },
   { command: "help", description: "How to use this bot" },
+  { command: "clear", description: "Delete this chat's messages" },
   { command: "cancel", description: "Cancel the current operation" },
 ]).catch(() => {});
 
@@ -462,6 +469,22 @@ bot.onText(/\/cancel/, (msg) => {
   resetState(msg.chat.id);
   markNonMenu(msg.chat.id);
   bot.sendMessage(msg.chat.id, t(msg.chat.id, "cancelled"));
+});
+
+// Telegram không có API "xóa cả đoạn chat" cho bot — id tin nhắn trong 1 chat riêng tăng dần
+// và dùng chung cho cả 2 phía, nên xóa lùi lại một khoảng id là cách thực tế nhất để dọn sạch
+// lịch sử gần đây. Tin quá cũ (>48h) hoặc đã xóa sẽ tự thất bại êm, không ảnh hưởng gì.
+const CLEAR_LOOKBACK = 300;
+bot.onText(/\/clear/, async (msg) => {
+  const chatId = msg.chat.id;
+  resetState(chatId);
+  const jobs = [];
+  for (let id = msg.message_id; id > Math.max(0, msg.message_id - CLEAR_LOOKBACK); id--) {
+    jobs.push(bot.deleteMessage(chatId, id).catch(() => {}));
+  }
+  await Promise.allSettled(jobs);
+  markNonMenu(chatId);
+  bot.sendMessage(chatId, t(chatId, "cleared"));
 });
 
 bot.onText(/\/lang/, (msg) => {
