@@ -339,6 +339,12 @@ async function apiMarkDownloaded(slug) {
   try { await fetch(`${API_BASE}/api/item/${slug}/downloaded`, { method: "POST" }); } catch { /* best-effort */ }
 }
 
+// Báo server đã giải mã thành công (đúng mật khẩu) — chỉ gọi sau khi gcmDecrypt thành công,
+// giống nguyên tắc bên web, để tránh việc chỉ tra cứu item (apiGetItem) bị tính nhầm là "đã giải mã".
+async function apiMarkDecrypted(slug) {
+  try { await fetch(`${API_BASE}/api/item/${slug}/decrypted`, { method: "POST" }); } catch { /* best-effort */ }
+}
+
 function extractSlug(input) {
   const s = input.trim();
   const last = s.split("/").filter(Boolean).pop() || "";
@@ -784,6 +790,7 @@ async function handleDecryptMsg(chatId, st, msg) {
     }
     // Đúng mật khẩu — xóa luôn cả chuỗi tin nhắn hỏi mật khẩu / báo sai trước đó, chỉ giữ kết quả.
     (st.data.secretMsgIds || []).forEach((id) => deleteSoon(chatId, id));
+    if (st.data.slug) await apiMarkDecrypted(st.data.slug);
     const envelope = parseEnvelope(pt);
     if (envelope.isFile) {
       await bot.sendDocument(chatId, Buffer.from(envelope.fileBytes), {}, { filename: envelope.filename, contentType: envelope.mime });

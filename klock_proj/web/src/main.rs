@@ -42,6 +42,10 @@ const MAX_WRAPPED_BYTES: u64 = 150 * 1024 * 1024; // ~100MB file gốc + overhea
 struct App {
     store: Store,
     encrypt_limiter: RateLimiter,
+    // Giới hạn riêng (rộng hơn) cho các thao tác đọc/trạng thái theo slug (item, downloaded,
+    // decrypted) — trước đây các endpoint này không bị giới hạn tần suất gì cả, cho phép dò/ép
+    // trạng thái (vd rút ngắn thời hạn lưu) hàng loạt không giới hạn.
+    item_limiter: RateLimiter,
     static_dir: String,
 }
 
@@ -84,15 +88,51 @@ async fn encrypt(
     Json(EncryptResp { slug }).into_response()
 }
 
-async fn item(State(app): State<Arc<App>>, Path(slug): Path<String>) -> impl IntoResponse {
-    match app.store.get_and_touch(&slug) {
+/// Chỉ đọc dữ liệu thô (code + wrapped) để client thử giải mã cục bộ — KHÔNG đặt hẹn giờ xóa
+/// ở đây, vì endpoint này có thể bị gọi bởi bất kỳ ai/bot nào mở URL (trình quét link email,
+/// trình xem trước link của ứng dụng chat, …), chưa chắc là người nhận thật đã giải mã được gì.
+async fn item(
+    State(app): State<Arc<App>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+) -> impl IntoResponse {
+    if !app.item_limiter.allow(client_ip(&headers, addr)) {
+        return (StatusCode::TOO_MANY_REQUESTS, "quá nhiều yêu cầu, thử lại sau").into_response();
+    }
+    match app.store.get(&slug) {
         Some(r) => Json(r).into_response(),
         None => (StatusCode::NOT_FOUND, "không tìm thấy").into_response(),
     }
 }
 
+/// Client báo đã giải mã THÀNH CÔNG (đúng mật khẩu) — đây mới là lúc bắt đầu đếm giờ xóa 15 phút.
+async fn decrypted(
+    State(app): State<Arc<App>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+) -> impl IntoResponse {
+    if !app.item_limiter.allow(client_ip(&headers, addr)) {
+        return StatusCode::TOO_MANY_REQUESTS;
+    }
+    if app.store.mark_decrypted(&slug) {
+        StatusCode::OK
+    } else {
+        StatusCode::NOT_FOUND
+    }
+}
+
 /// Người dùng vừa tải xong nội dung đã giải mã — rút ngắn thời gian lưu còn 5 phút.
-async fn downloaded(State(app): State<Arc<App>>, Path(slug): Path<String>) -> impl IntoResponse {
+async fn downloaded(
+    State(app): State<Arc<App>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Path(slug): Path<String>,
+) -> impl IntoResponse {
+    if !app.item_limiter.allow(client_ip(&headers, addr)) {
+        return StatusCode::TOO_MANY_REQUESTS;
+    }
     if app.store.mark_downloaded(&slug) {
         StatusCode::OK
     } else {
@@ -184,6 +224,7 @@ async fn main() {
     let app = Arc::new(App {
         store,
         encrypt_limiter: RateLimiter::new(20, Duration::from_secs(300)), // 20 lần/5 phút mỗi IP
+        item_limiter: RateLimiter::new(60, Duration::from_secs(300)), // 60 lần/5 phút mỗi IP
         static_dir,
     });
 
@@ -191,6 +232,7 @@ async fn main() {
         .route("/api/encrypt", post(encrypt))
         .route("/api/item/:slug", get(item))
         .route("/api/item/:slug/downloaded", post(downloaded))
+        .route("/api/item/:slug/decrypted", post(decrypted))
         .route("/api/item/:slug/confirm-payment", post(confirm_payment))
         .layer(DefaultBodyLimit::max(MAX_WRAPPED_BYTES as usize + 4096))
         .layer(RequestDecompressionLayer::new().gzip(true))

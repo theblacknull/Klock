@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const DAY: i64 = 24 * 3600;
@@ -50,12 +51,16 @@ pub fn unlock_unix_from_code(code: &str) -> Option<i64> {
 #[derive(Clone)]
 pub struct Store {
     dir: PathBuf,
+    // Khóa chống race-condition cho claim_tx: không có khóa này, nhiều request xác nhận
+    // thanh toán đồng thời với CÙNG 1 tx_hash có thể đều đọc file "_used_tx.json" trước khi
+    // bất kỳ request nào kịp ghi lại, khiến 1 giao dịch 1 USDT mở khóa vĩnh viễn được nhiều slug.
+    used_tx_lock: Arc<Mutex<()>>,
 }
 
 impl Store {
     pub fn open(dir: PathBuf) -> Self {
         std::fs::create_dir_all(&dir).ok();
-        Self { dir }
+        Self { dir, used_tx_lock: Arc::new(Mutex::new(())) }
     }
 
     fn path(&self, slug: &str) -> PathBuf {
@@ -69,6 +74,9 @@ impl Store {
     /// Đánh dấu 1 hash giao dịch đã được dùng để mở khóa lưu vĩnh viễn.
     /// Trả về true nếu đây là lần đầu dùng (hợp lệ), false nếu đã dùng rồi (chặn tái sử dụng).
     pub fn claim_tx(&self, tx_hash: &str) -> bool {
+        // Giữ khóa trong suốt chuỗi đọc-kiểm tra-ghi để loại bỏ race condition giữa các
+        // request xác nhận thanh toán đồng thời (xem comment ở định nghĩa `used_tx_lock`).
+        let _guard = self.used_tx_lock.lock().unwrap();
         let p = self.used_tx_path();
         let mut set: std::collections::HashSet<String> = std::fs::read_to_string(&p)
             .ok()
@@ -107,15 +115,24 @@ impl Store {
         serde_json::from_str(&data).ok()
     }
 
-    /// Đọc bản ghi; nếu đây là lần truy cập đầu tiên (giải mã thành công) thì bắt đầu hẹn giờ xóa sau 15 phút.
-    pub fn get_and_touch(&self, slug: &str) -> Option<Record> {
-        let mut rec = self.read(slug)?;
+    /// Đọc bản ghi, KHÔNG side-effect. Chỉ tải dữ liệu để client thử giải mã cục bộ —
+    /// không được coi là "đã giải mã" vì tại đây client còn chưa nhập/kiểm tra mật khẩu, và
+    /// bất kỳ ai/bot nào (trình quét link email, trình xem trước link của ứng dụng chat, …)
+    /// mở URL cũng sẽ gọi tới đây. Dùng `mark_decrypted` để bắt đầu đếm giờ xóa thật sự.
+    pub fn get(&self, slug: &str) -> Option<Record> {
+        self.read(slug)
+    }
+
+    /// Client báo đã giải mã THÀNH CÔNG (đã qua được AES-GCM với đúng mật khẩu) — đây mới là
+    /// lúc hẹn giờ xóa sau 15 phút nên bắt đầu, không phải lúc chỉ tải dữ liệu thô về.
+    pub fn mark_decrypted(&self, slug: &str) -> bool {
+        let Some(mut rec) = self.read(slug) else { return false };
         if rec.first_accessed_at.is_none() && !rec.permanent {
             rec.first_accessed_at = Some(now());
             rec.delete_at = Some(now() + 15 * MIN);
             self.write(slug, &rec);
         }
-        Some(rec)
+        true
     }
 
     /// Người dùng đã tải xong file/nội dung đã giải mã — rút ngắn còn 5 phút kể từ bây giờ.
@@ -168,5 +185,36 @@ impl Store {
             }
         }
         removed
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Trước khi thêm `used_tx_lock`, N luồng gọi `claim_tx` đồng thời với CÙNG 1 tx_hash
+    /// có thể đều đọc file trước khi bất kỳ luồng nào kịp ghi lại, khiến nhiều hơn 1 luồng
+    /// nhận được `true` — tức 1 giao dịch mở khóa vĩnh viễn được nhiều slug. Test này xác
+    /// nhận rằng đúng 1 luồng duy nhất thắng.
+    #[test]
+    fn claim_tx_is_exclusive_under_concurrency() {
+        let dir = std::env::temp_dir().join(format!("klock_store_test_{}", now()));
+        let store = Store::open(dir.clone());
+        let tx_hash = "0xsametxhash";
+
+        let handles: Vec<_> = (0..32)
+            .map(|_| {
+                let store = store.clone();
+                std::thread::spawn(move || store.claim_tx(tx_hash))
+            })
+            .collect();
+
+        let wins = handles.into_iter().map(|h| h.join().unwrap()).filter(|&ok| ok).count();
+        let blocked = 32 - wins;
+        // Đúng 1 luồng duy nhất được claim thành công (true); 31 luồng còn lại phải bị chặn (false).
+        assert_eq!(wins, 1, "chỉ đúng 1 luồng được phép claim cùng 1 tx_hash");
+        assert_eq!(blocked, 31);
+
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

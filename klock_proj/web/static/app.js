@@ -402,6 +402,15 @@ function notifyDownloaded() {
   }
 }
 
+// Báo cho server rằng mật khẩu đã đúng và nội dung đã thực sự được giải mã — CHỈ gọi ở đây
+// (sau khi AES-GCM decrypt thành công), không phải lúc chỉ tải dữ liệu thô về, để tránh bị
+// bot quét link/trình xem trước link kích hoạt nhầm hẹn giờ xóa trước khi người nhận thật mở link.
+function notifyDecrypted() {
+  if (currentSlug) {
+    fetch("/api/item/" + currentSlug + "/decrypted", { method: "POST" }).catch(() => {});
+  }
+}
+
 function extractSlug(input) {
   const s = input.trim();
   const last = s.split("/").filter(Boolean).pop() || "";
@@ -503,6 +512,7 @@ async function doDecryptFinal() {
     const pt = await gcmDecrypt(key, nonceBytes, aad, ct);
     stop();
     setProgress(btn, 100);
+    notifyDecrypted();
     const envelope = parseEnvelope(pt);
     revokeDecObjectUrl();
     const textEl = document.getElementById("decOutText");
@@ -551,6 +561,7 @@ window.onFilePicked = onFilePicked;
 window.clearFile = clearFile;
 window.onDecFilePicked = onDecFilePicked;
 window.notifyDownloaded = notifyDownloaded;
+window.notifyDecrypted = notifyDecrypted;
 window.clearDecFile = clearDecFile;
 window.markEncConsumed = markEncConsumed;
 window.markDecConsumed = markDecConsumed;
