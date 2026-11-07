@@ -400,6 +400,20 @@ function fmtTzTime(ms, chatId) {
 const states = new Map();
 const resetState = (chatId) => states.delete(chatId);
 
+// Xử lý tuần tự theo từng chat — nếu người dùng gửi liên tiếp nhiều tin nhắn (vd dán lại
+// cùng 1 link 2-3 lần liền tay) mà không chờ bot trả lời, các "message"/"callback_query"
+// handler (đều là async, có await bên trong) có thể chạy CHỒNG LẤN nhau cho cùng 1 chatId,
+// đọc/ghi state cũ-mới lẫn lộn — gây lỗi khó lường (vd menu /start hiện ra giữa chừng trong
+// khi bước giải mã vẫn đang chạy tiếp ở 1 lệnh gọi khác). Hàng đợi này đảm bảo tại 1 thời
+// điểm chỉ có đúng 1 việc đang xử lý cho mỗi chatId.
+const chatQueues = new Map();
+function enqueue(chatId, job) {
+  const prev = chatQueues.get(chatId) || Promise.resolve();
+  const next = prev.then(job, job).catch((e) => console.error("klock-bot lỗi hàng đợi:", e));
+  chatQueues.set(chatId, next);
+  return next;
+}
+
 function mainMenu(chatId) {
   return { reply_markup: { inline_keyboard: [
     [{ text: t(chatId, "btnEnc"), callback_data: "enc" }, { text: t(chatId, "btnDec"), callback_data: "dec" }],
@@ -462,24 +476,24 @@ bot.setMyCommands([
   { command: "cancel", description: "Cancel the current operation" },
 ]).catch(() => {});
 
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start/, (msg) => enqueue(msg.chat.id, () => {
   const chatId = msg.chat.id;
   if (!chatLang.has(chatId)) setLang(chatId, inferLang(msg.from && msg.from.language_code));
   resetState(chatId);
   sendMenu(chatId);
-});
+}));
 
-bot.onText(/\/cancel/, (msg) => {
+bot.onText(/\/cancel/, (msg) => enqueue(msg.chat.id, () => {
   resetState(msg.chat.id);
   markNonMenu(msg.chat.id);
   bot.sendMessage(msg.chat.id, t(msg.chat.id, "cancelled"));
-});
+}));
 
 // Telegram không có API "xóa cả đoạn chat" cho bot — id tin nhắn trong 1 chat riêng tăng dần
 // và dùng chung cho cả 2 phía, nên xóa lùi lại một khoảng id là cách thực tế nhất để dọn sạch
 // lịch sử gần đây. Tin quá cũ (>48h) hoặc đã xóa sẽ tự thất bại êm, không ảnh hưởng gì.
 const CLEAR_LOOKBACK = 300;
-bot.onText(/\/clear/, async (msg) => {
+bot.onText(/\/clear/, (msg) => enqueue(msg.chat.id, async () => {
   const chatId = msg.chat.id;
   resetState(chatId);
   const jobs = [];
@@ -491,23 +505,27 @@ bot.onText(/\/clear/, async (msg) => {
   // "đã xóa" rời rạc, để người dùng có ngay lối thao tác tiếp theo.
   lastWasMenu.delete(chatId);
   sendMenu(chatId);
-});
+}));
 
-bot.onText(/\/lang/, (msg) => {
+bot.onText(/\/lang/, (msg) => enqueue(msg.chat.id, () => {
   markNonMenu(msg.chat.id);
   bot.sendMessage(msg.chat.id, t(msg.chat.id, "chooseLang"), langMenu());
-});
+}));
 
-bot.onText(/\/help/, (msg) => {
+bot.onText(/\/help/, (msg) => enqueue(msg.chat.id, () => {
   markNonMenu(msg.chat.id);
   bot.sendMessage(msg.chat.id, t(msg.chat.id, "helpText"), { parse_mode: "HTML" });
+}));
+
+bot.onText(/\/encrypt/, (msg) => enqueue(msg.chat.id, () => startEncrypt(msg.chat.id)));
+bot.onText(/\/decrypt/, (msg) => enqueue(msg.chat.id, () => startDecrypt(msg.chat.id)));
+
+bot.on("callback_query", (q) => {
+  bot.answerCallbackQuery(q.id).catch(() => {});
+  enqueue(q.message.chat.id, () => handleCallbackQuery(q));
 });
 
-bot.onText(/\/encrypt/, (msg) => startEncrypt(msg.chat.id));
-bot.onText(/\/decrypt/, (msg) => startDecrypt(msg.chat.id));
-
-bot.on("callback_query", async (q) => {
-  bot.answerCallbackQuery(q.id).catch(() => {});
+async function handleCallbackQuery(q) {
   const chatId = q.message.chat.id;
   const data = q.data || "";
 
@@ -543,7 +561,7 @@ bot.on("callback_query", async (q) => {
       resetState(chatId);
     }
   }
-});
+}
 
 function startEncrypt(chatId) {
   states.set(chatId, { mode: "enc", step: "secret", data: {} });
@@ -561,9 +579,13 @@ function startDecrypt(chatId) {
 }
 
 // ---- xử lý tin nhắn văn bản theo state ----
-bot.on("message", async (msg) => {
-  const chatId = msg.chat.id;
+bot.on("message", (msg) => {
   if (msg.text && msg.text.startsWith("/")) return; // đã xử lý bởi onText
+  enqueue(msg.chat.id, () => handleMessage(msg));
+});
+
+async function handleMessage(msg) {
+  const chatId = msg.chat.id;
   const st = states.get(chatId);
   if (!st) {
     // không ở giữa bước nào (không phải lúc nhập thời gian/mật khẩu/nội dung...) — nhắn gì
@@ -584,7 +606,7 @@ bot.on("message", async (msg) => {
     }
     resetState(chatId);
   }
-});
+}
 
 async function downloadTelegramFile(fileId) {
   const link = await bot.getFileLink(fileId);
@@ -730,6 +752,13 @@ async function handleDecryptMsg(chatId, st, msg) {
 
   if (st.step === "secret") {
     if (!msg.text) return bot.sendMessage(chatId, t(chatId, "onlyText"));
+    // Người dùng dán lại link (hoặc đúng slug đã dùng) thay vì gõ mật khẩu — dễ nhầm sau khi
+    // đã qua bước nhập link. Nhắc lại chứ không tính là 1 lần sai, không xóa (không nhạy cảm).
+    // Chỉ bắt link đầy đủ hoặc đúng slug cũ để tránh nhầm với mật khẩu thật dài 6 ký tự.
+    const looksLikeResentLink = /^https?:\/\//i.test(msg.text.trim()) || (st.data.slug && extractSlug(msg.text) === st.data.slug);
+    if (looksLikeResentLink) {
+      return bot.sendMessage(chatId, t(chatId, "askDecSecret"), { parse_mode: "Markdown" });
+    }
     deleteSoon(chatId, msg.message_id);
     const { code, ct } = st.data;
     const x0 = code.slice(0, code.length - 14);
