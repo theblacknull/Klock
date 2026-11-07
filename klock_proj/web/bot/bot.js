@@ -97,7 +97,6 @@ const I18N = {
     decryptedResult: "✅ Result:\n\n{text}",
     fileTooLarge: "File too large (limit ~19MB over Telegram).",
     cancelled: "Cancelled. /start to begin again.",
-    cleared: "🧹 Chat cleared.",
     chooseLang: "🌐 Choose your language:", langSet: "✅ Language set to English.",
     genericError: "⚠️ Error: {err}", fileDownloadErr: "Could not download the file.",
     helpText: "📘 <b>How to use</b>\n🔒 /encrypt — password, content/file, unlock time → get a link + .json file.\n🔓 /decrypt — send the link or .json file, then the password (after unlock time).\n🌐 /lang — change language.\n🧹 /clear — delete this chat's messages.\n❌ /cancel — cancel the current step.\nFiles up to ~19MB.",
@@ -129,7 +128,6 @@ const I18N = {
     decryptedResult: "✅ Kết quả:\n\n{text}",
     fileTooLarge: "File quá lớn (giới hạn ~19MB qua Telegram).",
     cancelled: "Đã hủy. /start để bắt đầu lại.",
-    cleared: "🧹 Đã xóa đoạn chat.",
     chooseLang: "🌐 Chọn ngôn ngữ:", langSet: "✅ Đã đổi ngôn ngữ sang Tiếng Việt.",
     genericError: "⚠️ Lỗi: {err}", fileDownloadErr: "Không tải được file.",
     helpText: "📘 <b>Hướng dẫn sử dụng</b>\n🔒 /encrypt — mật khẩu, nội dung/file, thời gian mở khóa → nhận link + file .json.\n🔓 /decrypt — gửi link hoặc file .json, rồi mật khẩu (sau khi tới giờ mở khóa).\n🌐 /lang — đổi ngôn ngữ.\n🧹 /clear — xóa tin nhắn trong đoạn chat.\n❌ /cancel — hủy bước đang làm.\nFile tối đa ~19MB.",
@@ -161,7 +159,6 @@ const I18N = {
     decryptedResult: "✅ Результат:\n\n{text}",
     fileTooLarge: "Файл слишком большой (лимит Telegram ~19МБ).",
     cancelled: "Отменено. /start чтобы начать снова.",
-    cleared: "🧹 Чат очищен.",
     chooseLang: "🌐 Выберите язык:", langSet: "✅ Язык изменён на русский.",
     genericError: "⚠️ Ошибка: {err}", fileDownloadErr: "Не удалось скачать файл.",
     helpText: "📘 <b>Как использовать</b>\n🔒 /encrypt — пароль, текст/файл, время разблокировки → ссылка + .json файл.\n🔓 /decrypt — отправьте ссылку или .json файл, затем пароль (после разблокировки).\n🌐 /lang — сменить язык.\n🧹 /clear — удалить сообщения этого чата.\n❌ /cancel — отменить текущий шаг.\nФайлы до ~19МБ.",
@@ -193,7 +190,6 @@ const I18N = {
     decryptedResult: "✅ 结果:\n\n{text}",
     fileTooLarge: "文件过大(Telegram 限制约19MB)。",
     cancelled: "已取消。发送 /start 重新开始。",
-    cleared: "🧹 聊天已清空。",
     chooseLang: "🌐 选择语言:", langSet: "✅ 语言已切换为中文。",
     genericError: "⚠️ 出错: {err}", fileDownloadErr: "无法下载文件。",
     helpText: "📘 <b>使用说明</b>\n🔒 /encrypt — 密码、内容/文件、解锁时间 → 获得链接 + .json 文件。\n🔓 /decrypt — 发送链接或 .json 文件,然后输入密码(解锁后)。\n🌐 /lang — 更改语言。\n🧹 /clear — 删除此聊天的消息。\n❌ /cancel — 取消当前步骤。\n文件最大约19MB。",
@@ -225,7 +221,6 @@ const I18N = {
     decryptedResult: "✅ Resultado:\n\n{text}",
     fileTooLarge: "Archivo demasiado grande (límite ~19MB).",
     cancelled: "Cancelado. /start para empezar de nuevo.",
-    cleared: "🧹 Chat borrado.",
     chooseLang: "🌐 Elige tu idioma:", langSet: "✅ Idioma cambiado a español.",
     genericError: "⚠️ Error: {err}", fileDownloadErr: "No se pudo descargar el archivo.",
     helpText: "📘 <b>Cómo usarlo</b>\n🔒 /encrypt — contraseña, contenido/archivo, hora de desbloqueo → enlace + archivo .json.\n🔓 /decrypt — envía el enlace o el archivo .json, luego la contraseña (tras desbloquear).\n🌐 /lang — cambiar idioma.\n🧹 /clear — borrar los mensajes de este chat.\n❌ /cancel — cancelar el paso actual.\nArchivos hasta ~19MB.",
@@ -412,17 +407,26 @@ function mainMenu(chatId) {
   ] } };
 }
 
-// Theo dõi xem tin nhắn gần nhất bot gửi cho chat này có phải là menu /start không, để tránh
-// gửi trùng 2 lần liên tiếp (vd người dùng gõ vài tin nhắn vu vơ liền nhau lúc đang rảnh).
+// Theo dõi xem tin nhắn gần nhất BOT gửi cho chat này có phải là menu /start không. Chỉ dùng
+// để chặn bot tự gửi trùng menu 2 lần liên tiếp mà KHÔNG có tin nhắn mới nào từ người dùng ở
+// giữa (vd nhắc lại menu sau 1 phút trùng với lúc người dùng vừa nhắn tin gì đó nên menu đã
+// hiện rồi) — còn khi người dùng chủ động nhắn (dù đang rảnh) thì luôn trả lời menu, không
+// bao giờ bị chặn, vì đó không phải "trùng lặp" mà là phản hồi cho 1 tin nhắn mới thật sự.
 const lastWasMenu = new Map();
 function markNonMenu(chatId) { lastWasMenu.set(chatId, false); }
 
-// Gửi lại đúng tin nhắn/menu như /start — dùng để người dùng thao tác tiếp ngay sau khi
-// mã hóa/giải mã xong, không cần tự gõ /start lại.
+// Gửi lại đúng tin nhắn/menu như /start — luôn gửi (dùng cho /start, menu khi đang rảnh, và
+// sau /clear). Đồng thời đánh dấu để nhắc menu tự động (sendMenuIfIdle) biết mà bỏ qua.
 function sendMenu(chatId) {
-  if (lastWasMenu.get(chatId)) return; // tin liền trước đã là menu rồi — bỏ qua, tránh trùng lặp
   lastWasMenu.set(chatId, true);
   bot.sendMessage(chatId, t(chatId, "start"), { parse_mode: "HTML", ...mainMenu(chatId) });
+}
+
+// Chỉ dùng cho lời nhắc menu tự động sau 1 phút (sau khi mã hóa/giải mã xong) — bỏ qua nếu
+// trong lúc chờ đó đã có menu được gửi rồi (vd người dùng tự nhắn gì đó khiến menu hiện ra).
+function sendMenuIfIdle(chatId) {
+  if (lastWasMenu.get(chatId)) return;
+  sendMenu(chatId);
 }
 
 function langMenu() {
@@ -483,8 +487,10 @@ bot.onText(/\/clear/, async (msg) => {
     jobs.push(bot.deleteMessage(chatId, id).catch(() => {}));
   }
   await Promise.allSettled(jobs);
-  markNonMenu(chatId);
-  bot.sendMessage(chatId, t(chatId, "cleared"));
+  // Đoạn chat giờ trống trơn — gửi luôn menu /start làm tin nhắn đầu tiên, thay vì 1 dòng
+  // "đã xóa" rời rạc, để người dùng có ngay lối thao tác tiếp theo.
+  lastWasMenu.delete(chatId);
+  sendMenu(chatId);
 });
 
 bot.onText(/\/lang/, (msg) => {
@@ -627,7 +633,7 @@ async function performEncrypt(chatId, st, unlockMs, timeLabel) {
     reply_markup: { inline_keyboard: [[{ text: t(chatId, "btnCopyLink"), copy_text: { text: link } }]] },
   });
   resetState(chatId);
-  setTimeout(() => sendMenu(chatId), 60000); // chờ 1 phút để người dùng đọc/lấy file+link trước khi hiện menu
+  setTimeout(() => sendMenuIfIdle(chatId), 60000); // chờ 1 phút để người dùng đọc/lấy file+link trước khi hiện menu
 }
 
 async function handleEncryptMsg(chatId, st, msg) {
@@ -757,7 +763,7 @@ async function handleDecryptMsg(chatId, st, msg) {
       await bot.sendMessage(chatId, t(chatId, "decryptedResult", { text: envelope.text }));
     }
     resetState(chatId);
-    setTimeout(() => sendMenu(chatId), 60000); // chờ 1 phút để người dùng xem kết quả trước khi hiện menu
+    setTimeout(() => sendMenuIfIdle(chatId), 60000); // chờ 1 phút để người dùng xem kết quả trước khi hiện menu
   }
 }
 
