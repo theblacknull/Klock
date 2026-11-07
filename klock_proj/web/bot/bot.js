@@ -71,7 +71,7 @@ function t(chatId, key, vars) {
 
 const I18N = {
   en: {
-    start: "<blockquote>🔐 <b>Klock</b>\nI'm your data-protection assistant, resistant to quantum computers and supercomputers. Decrypting my files needs both time and a secret key!</blockquote>\n🔒 Encrypt: password + time → get a link/file.\n🔓 Decrypt: send link/file + password.\n\nChoose an action:",
+    start: "<blockquote>🔐 <b>Klock</b>\nI'm your data-protection assistant, resistant to quantum computers and supercomputers. Decrypting my files needs both time and a secret key!</blockquote>\n\nChoose an action:",
     btnEnc: "🔒 Encrypt", btnDec: "🔓 Decrypt", btnLang: "🌐 Language", btnHelp: "📘 Help",
     askSecretEnc: "🔑 Secret password:",
     onlyText: "Please send as text.",
@@ -102,7 +102,7 @@ const I18N = {
     helpText: "📘 <b>How to use</b>\n🔒 /encrypt — password, content/file, unlock time → get a link + .json file.\n🔓 /decrypt — send the link or .json file, then the password (after unlock time).\n🌐 /lang — change language.\n❌ /cancel — cancel the current step.\nFiles up to ~19MB.",
   },
   vi: {
-    start: "<blockquote>🔐 <b>Klock</b>\nTôi là trợ lý bảo vệ dữ liệu cho bạn, chống lại máy tính lượng tử và các siêu máy tính. Để giải mã được file của tôi cần thời gian và khóa bí mật!</blockquote>\n🔒 Mã hóa: mật khẩu + thời gian → nhận link/file.\n🔓 Giải mã: gửi link/file + mật khẩu.\n\nChọn thao tác:",
+    start: "<blockquote>🔐 <b>Klock</b>\nTôi là trợ lý bảo vệ dữ liệu cho bạn, chống lại máy tính lượng tử và các siêu máy tính. Để giải mã được file của tôi cần thời gian và khóa bí mật!</blockquote>\n\nChọn thao tác:",
     btnEnc: "🔒 Mã hóa", btnDec: "🔓 Giải mã", btnLang: "🌐 Ngôn ngữ", btnHelp: "📘 Hướng dẫn",
     askSecretEnc: "🔑 Mật khẩu bí mật:",
     onlyText: "Vui lòng nhập dạng văn bản.",
@@ -133,7 +133,7 @@ const I18N = {
     helpText: "📘 <b>Hướng dẫn sử dụng</b>\n🔒 /encrypt — mật khẩu, nội dung/file, thời gian mở khóa → nhận link + file .json.\n🔓 /decrypt — gửi link hoặc file .json, rồi mật khẩu (sau khi tới giờ mở khóa).\n🌐 /lang — đổi ngôn ngữ.\n❌ /cancel — hủy bước đang làm.\nFile tối đa ~19MB.",
   },
   ru: {
-    start: "<blockquote>🔐 <b>Klock</b>\nЯ ваш помощник по защите данных, устойчивый к квантовым компьютерам и суперкомпьютерам. Для расшифровки файла нужны время и секретный ключ!</blockquote>\n🔒 Шифрование: пароль + время → ссылка/файл.\n🔓 Расшифровка: ссылка/файл + пароль.\n\nВыберите действие:",
+    start: "<blockquote>🔐 <b>Klock</b>\nЯ ваш помощник по защите данных, устойчивый к квантовым компьютерам и суперкомпьютерам. Для расшифровки файла нужны время и секретный ключ!</blockquote>\n\nВыберите действие:",
     btnEnc: "🔒 Зашифровать", btnDec: "🔓 Расшифровать", btnLang: "🌐 Язык", btnHelp: "📘 Справка",
     askSecretEnc: "🔑 Секретный пароль:",
     onlyText: "Введите текстом.",
@@ -164,7 +164,7 @@ const I18N = {
     helpText: "📘 <b>Как использовать</b>\n🔒 /encrypt — пароль, текст/файл, время разблокировки → ссылка + .json файл.\n🔓 /decrypt — отправьте ссылку или .json файл, затем пароль (после разблокировки).\n🌐 /lang — сменить язык.\n❌ /cancel — отменить текущий шаг.\nФайлы до ~19МБ.",
   },
   zh: {
-    start: "<blockquote>🔐 <b>Klock</b>\n我是你的数据保护助手,能抵御量子计算机和超级计算机。解密文件需要时间和密钥!</blockquote>\n🔒 加密:密码+时间→获得链接/文件。\n🔓 解密:发送链接/文件+密码。\n\n请选择操作:",
+    start: "<blockquote>🔐 <b>Klock</b>\n我是你的数据保护助手,能抵御量子计算机和超级计算机。解密文件需要时间和密钥!</blockquote>\n\n请选择操作:",
     btnEnc: "🔒 加密", btnDec: "🔓 解密", btnLang: "🌐 语言", btnHelp: "📘 帮助",
     askSecretEnc: "🔑 密码:",
     onlyText: "请以文字输入。",
@@ -195,7 +195,7 @@ const I18N = {
     helpText: "📘 <b>使用说明</b>\n🔒 /encrypt — 密码、内容/文件、解锁时间 → 获得链接 + .json 文件。\n🔓 /decrypt — 发送链接或 .json 文件,然后输入密码(解锁后)。\n🌐 /lang — 更改语言。\n❌ /cancel — 取消当前步骤。\n文件最大约19MB。",
   },
   es: {
-    start: "<blockquote>🔐 <b>Klock</b>\nSoy tu asistente de protección de datos, resistente a ordenadores cuánticos y superordenadores. Descifrar un archivo necesita tiempo y una clave secreta!</blockquote>\n🔒 Cifrar: contraseña + tiempo → enlace/archivo.\n🔓 Descifrar: enlace/archivo + contraseña.\n\nElige una acción:",
+    start: "<blockquote>🔐 <b>Klock</b>\nSoy tu asistente de protección de datos, resistente a ordenadores cuánticos y superordenadores. Descifrar un archivo necesita tiempo y una clave secreta!</blockquote>\n\nElige una acción:",
     btnEnc: "🔒 Cifrar", btnDec: "🔓 Descifrar", btnLang: "🌐 Idioma", btnHelp: "📘 Ayuda",
     askSecretEnc: "🔑 Contraseña secreta:",
     onlyText: "Envíalo como texto.",
@@ -577,7 +577,7 @@ async function performEncrypt(chatId, st, unlockMs, timeLabel) {
     reply_markup: { inline_keyboard: [[{ text: t(chatId, "btnCopyLink"), copy_text: { text: link } }]] },
   });
   resetState(chatId);
-  sendMenu(chatId);
+  setTimeout(() => sendMenu(chatId), 60000); // chờ 1 phút để người dùng đọc/lấy file+link trước khi hiện menu
 }
 
 async function handleEncryptMsg(chatId, st, msg) {
@@ -702,7 +702,7 @@ async function handleDecryptMsg(chatId, st, msg) {
       await bot.sendMessage(chatId, t(chatId, "decryptedResult", { text: envelope.text }));
     }
     resetState(chatId);
-    sendMenu(chatId);
+    setTimeout(() => sendMenu(chatId), 60000); // chờ 1 phút để người dùng xem kết quả trước khi hiện menu
   }
 }
 
