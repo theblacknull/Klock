@@ -361,15 +361,27 @@ function parseCustomDateTime(input, chatId) {
   return Number.isNaN(ms) ? null : ms;
 }
 
+// Luôn báo chính xác tới từng giây — nếu còn tính theo ngày/giờ thì vẫn hiện đủ ngày/giờ/phút/giây
+// phía dưới, để không bị làm tròn gây hiểu nhầm (vd còn 45 giây mà báo "0 phút" là sai).
 function fmtRemaining(ms, chatId) {
-  const s = Math.max(0, Math.round(ms / 1000));
-  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), mi = Math.floor((s % 3600) / 60);
-  const unit = { d: { en: "d", vi: " ngày", ru: " дн.", zh: " 天", es: " d" }, h: { en: "h", vi: " giờ", ru: " ч.", zh: " 时", es: " h" }, m: { en: "m", vi: " phút", ru: " мин", zh: " 分", es: " min" } };
+  const total = Math.max(0, Math.round(ms / 1000));
+  const d = Math.floor(total / 86400), h = Math.floor((total % 86400) / 3600);
+  const mi = Math.floor((total % 3600) / 60), s = total % 60;
+  const unit = {
+    d: { en: "d", vi: " ngày", ru: " дн.", zh: " 天", es: " d" },
+    h: { en: "h", vi: " giờ", ru: " ч.", zh: " 时", es: " h" },
+    m: { en: "m", vi: " phút", ru: " мин", zh: " 分", es: " min" },
+    s: { en: "s", vi: " giây", ru: " сек", zh: " 秒", es: " s" },
+  };
   const lang = getLang(chatId);
+  const vals = [["d", d], ["h", h], ["m", mi], ["s", s]];
   const parts = [];
-  if (d) parts.push(`${d}${unit.d[lang] || unit.d.en}`);
-  if (h) parts.push(`${h}${unit.h[lang] || unit.h.en}`);
-  if (mi || parts.length === 0) parts.push(`${mi}${unit.m[lang] || unit.m.en}`);
+  let started = false;
+  for (const [key, val] of vals) {
+    if (val > 0) started = true;
+    if (started) parts.push(`${val}${unit[key][lang] || unit[key].en}`);
+  }
+  if (parts.length === 0) parts.push(`0${unit.s[lang] || unit.s.en}`);
   return parts.join(" ");
 }
 
@@ -394,9 +406,16 @@ function mainMenu(chatId) {
   ] } };
 }
 
+// Theo dõi xem tin nhắn gần nhất bot gửi cho chat này có phải là menu /start không, để tránh
+// gửi trùng 2 lần liên tiếp (vd người dùng gõ vài tin nhắn vu vơ liền nhau lúc đang rảnh).
+const lastWasMenu = new Map();
+function markNonMenu(chatId) { lastWasMenu.set(chatId, false); }
+
 // Gửi lại đúng tin nhắn/menu như /start — dùng để người dùng thao tác tiếp ngay sau khi
 // mã hóa/giải mã xong, không cần tự gõ /start lại.
 function sendMenu(chatId) {
+  if (lastWasMenu.get(chatId)) return; // tin liền trước đã là menu rồi — bỏ qua, tránh trùng lặp
+  lastWasMenu.set(chatId, true);
   bot.sendMessage(chatId, t(chatId, "start"), { parse_mode: "HTML", ...mainMenu(chatId) });
 }
 
@@ -441,14 +460,17 @@ bot.onText(/\/start/, (msg) => {
 
 bot.onText(/\/cancel/, (msg) => {
   resetState(msg.chat.id);
+  markNonMenu(msg.chat.id);
   bot.sendMessage(msg.chat.id, t(msg.chat.id, "cancelled"));
 });
 
 bot.onText(/\/lang/, (msg) => {
+  markNonMenu(msg.chat.id);
   bot.sendMessage(msg.chat.id, t(msg.chat.id, "chooseLang"), langMenu());
 });
 
 bot.onText(/\/help/, (msg) => {
+  markNonMenu(msg.chat.id);
   bot.sendMessage(msg.chat.id, t(msg.chat.id, "helpText"), { parse_mode: "HTML" });
 });
 
@@ -462,12 +484,13 @@ bot.on("callback_query", async (q) => {
 
   if (data === "enc") return startEncrypt(chatId);
   if (data === "dec") return startDecrypt(chatId);
-  if (data === "help") return bot.sendMessage(chatId, t(chatId, "helpText"), { parse_mode: "HTML" });
-  if (data === "langmenu") return bot.sendMessage(chatId, t(chatId, "chooseLang"), langMenu());
+  if (data === "help") { markNonMenu(chatId); return bot.sendMessage(chatId, t(chatId, "helpText"), { parse_mode: "HTML" }); }
+  if (data === "langmenu") { markNonMenu(chatId); return bot.sendMessage(chatId, t(chatId, "chooseLang"), langMenu()); }
   if (data.startsWith("lang:")) {
     const lang = data.slice(5);
     if (SUPPORTED_LANGS.includes(lang)) {
       setLang(chatId, lang);
+      markNonMenu(chatId);
       bot.sendMessage(chatId, t(chatId, "langSet"));
     }
     return;
@@ -479,6 +502,7 @@ bot.on("callback_query", async (q) => {
     const val = data.slice(3);
     if (val === "custom") {
       st.step = "time_custom";
+      markNonMenu(chatId);
       return bot.sendMessage(chatId, t(chatId, "askCustomTime", { tz: tzLabel(chatId) }), { parse_mode: "Markdown" });
     }
     const unlockMs = Date.now() + Number(val) * 60000;
@@ -494,6 +518,7 @@ bot.on("callback_query", async (q) => {
 
 function startEncrypt(chatId) {
   states.set(chatId, { mode: "enc", step: "secret", data: {} });
+  markNonMenu(chatId);
   bot.sendMessage(chatId, t(chatId, "askSecretEnc"), { parse_mode: "Markdown" }).then((m) => {
     const st = states.get(chatId);
     if (st) st.data.secretPromptMsgId = m.message_id;
@@ -502,6 +527,7 @@ function startEncrypt(chatId) {
 
 function startDecrypt(chatId) {
   states.set(chatId, { mode: "dec", step: "input", data: {} });
+  markNonMenu(chatId);
   bot.sendMessage(chatId, t(chatId, "askDecInput"), { parse_mode: "Markdown" });
 }
 
@@ -548,6 +574,7 @@ function deleteSoon(chatId, messageId) {
 }
 
 async function performEncrypt(chatId, st, unlockMs, timeLabel) {
+  markNonMenu(chatId);
   if (unlockMs <= Date.now()) return bot.sendMessage(chatId, t(chatId, "mustBeFuture"));
   bot.sendMessage(chatId, t(chatId, "encrypting"));
 
@@ -581,6 +608,7 @@ async function performEncrypt(chatId, st, unlockMs, timeLabel) {
 }
 
 async function handleEncryptMsg(chatId, st, msg) {
+  markNonMenu(chatId);
   if (st.step === "secret") {
     if (!msg.text) return bot.sendMessage(chatId, t(chatId, "onlyText"));
     st.data.secret = msg.text;
@@ -618,6 +646,7 @@ async function handleEncryptMsg(chatId, st, msg) {
 }
 
 async function tryUnlockAndAskSecret(chatId, st, code, wrapped) {
+  markNonMenu(chatId);
   const unlockUnix = (() => {
     const d = code.slice(code.length - 14);
     const dd = +d.slice(0, 2), mo = +d.slice(2, 4), y = +d.slice(4, 8), h = +d.slice(8, 10), mi = +d.slice(10, 12), se = +d.slice(12, 14);
@@ -631,11 +660,13 @@ async function tryUnlockAndAskSecret(chatId, st, code, wrapped) {
     const locked = /too early/i.test(e.message || "");
     if (locked) {
       const remain = unlockUnix - Date.now();
-      bot.sendMessage(chatId, t(chatId, "locked", { remain: fmtRemaining(remain, chatId), time: new Date(unlockUnix).toISOString() }));
+      bot.sendMessage(chatId, t(chatId, "locked", { remain: fmtRemaining(remain, chatId) }));
     } else {
       bot.sendMessage(chatId, t(chatId, "networkErr"));
     }
-    resetState(chatId);
+    // Giữ nguyên bước "input" (không reset) — tin nhắn này đóng vai trò giống tin hỏi
+    // link/file ban đầu: người dùng có thể gửi lại link/file sau đó, bot vẫn nhận diện được.
+    st.step = "input";
     return;
   }
 
@@ -649,6 +680,7 @@ async function tryUnlockAndAskSecret(chatId, st, code, wrapped) {
 }
 
 async function handleDecryptMsg(chatId, st, msg) {
+  markNonMenu(chatId);
   if (st.step === "input") {
     if (msg.document) {
       const buf = await downloadTelegramFile(msg.document.file_id);
