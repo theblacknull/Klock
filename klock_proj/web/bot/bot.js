@@ -27,8 +27,19 @@ const argon2idReady = import("hash-wasm/dist/index.esm.js").then((m) => { argon2
 const API_BASE = process.env.API_BASE || "http://127.0.0.1:8787";
 const PUBLIC_BASE = process.env.PUBLIC_BASE || "https://klock.blacknull.net";
 const MAX_FILE_BYTES = 19 * 1024 * 1024; // giới hạn tải file của Telegram Bot API (~20MB)
-const VN_OFFSET_MIN = 7 * 60; // giờ nhập tay trong bot luôn là giờ Việt Nam (UTC+7)
 const MAX_WRONG_ATTEMPTS = 5; // chặn dò mật khẩu bằng cách spam sai nhiều lần
+
+// Múi giờ dùng khi nhập ngày giờ tay — đi theo ngôn ngữ bot đang chọn, mỗi ngôn ngữ ứng với
+// 1 múi giờ tiêu biểu cho vùng dùng ngôn ngữ đó (không có cách khác để suy múi giờ thật của
+// người dùng qua Bot API).
+const LANG_TZ_MIN = { en: 0, vi: 7 * 60, ru: 3 * 60, zh: 8 * 60, es: 1 * 60 };
+function tzOffsetMin(chatId) { return LANG_TZ_MIN[getLang(chatId)] ?? 0; }
+function tzLabel(chatId) {
+  const m = tzOffsetMin(chatId);
+  const sign = m >= 0 ? "+" : "-";
+  const a = Math.abs(m);
+  return `UTC${sign}${pad(Math.floor(a / 60), 2)}:${pad(a % 60, 2)}`;
+}
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: false });
 const drandClient = mainnetClient();
@@ -60,20 +71,21 @@ function t(chatId, key, vars) {
 
 const I18N = {
   en: {
-    start: "<blockquote>🔐 <b>Klock</b>\nI'm your data-protection assistant — decrypting my files needs both time and a secret key!</blockquote>\n\nChoose an action:",
-    btnEnc: "🔒 Encrypt", btnDec: "🔓 Decrypt", btnLang: "🌐 Language",
+    start: "<blockquote>🔐 <b>Klock</b>\nI'm your data-protection assistant — decrypting my files needs both time and a secret key!</blockquote>\n🔒 Encrypt: password + time → get a link/file.\n🔓 Decrypt: send link/file + password.\n\nChoose an action:",
+    btnEnc: "🔒 Encrypt", btnDec: "🔓 Decrypt", btnLang: "🌐 Language", btnHelp: "📘 Help",
     askSecretEnc: "🔑 Secret password:",
     onlyText: "Please send as text.",
     askMessage: "✍️ Content or file/photo to encrypt (≤19MB):",
     sendTextFileOrPhoto: "Send text, a file, or a photo.",
     askTimeChoose: "⏰ Unlock at:",
-    p10m: "+10 min", p1h: "+1 hour", p6h: "+6 hours", p1d: "+1 day", p3d: "+3 days", p1w: "+1 week", p1mo: "+1 month",
+    p1m: "+1 min", p10m: "+10 min", p1h: "+1 hour", p6h: "+6 hours", p1d: "+1 day", p3d: "+3 days", p1w: "+1 week", p1mo: "+1 month",
     pcustom: "📅 Custom",
-    askCustomTime: "Date/time (Vietnam, UTC+7):\n`YYYY-MM-DD HH:MM`",
+    askCustomTime: "Date/time ({tz}):\n`YYYY-MM-DD HH:MM`",
     badTimeFormat: "Wrong format. E.g.: `2026-12-25 08:00`",
     mustBeFuture: "The unlock time must be in the future.",
     encrypting: "⏳ Encrypting…",
     encryptedDone: "<blockquote>✅ Done!\n🔗 {link}\nUnlocks: {time}</blockquote>",
+    btnCopyLink: "📋 Copy link",
     askDecInput: "🔗 Paste a link or send the .json file:",
     invalidLink: "Invalid link.", notFound: "Not found (expired or wrong link).",
     jsonBadFormat: "Not a valid Klock .json file.",
@@ -87,22 +99,24 @@ const I18N = {
     cancelled: "Cancelled. /start to begin again.",
     chooseLang: "🌐 Choose your language:", langSet: "✅ Language set to English.",
     genericError: "⚠️ Error: {err}", fileDownloadErr: "Could not download the file.",
+    helpText: "📘 <b>How to use</b>\n🔒 /encrypt — password, content/file, unlock time → get a link + .json file.\n🔓 /decrypt — send the link or .json file, then the password (after unlock time).\n🌐 /lang — change language.\n❌ /cancel — cancel the current step.\nFiles up to ~19MB.",
   },
   vi: {
-    start: "<blockquote>🔐 <b>Klock</b>\nTôi là trợ lý bảo vệ dữ liệu cho bạn, để giải mã được file của tôi cần thời gian và khóa bí mật!</blockquote>\n\nChọn thao tác:",
-    btnEnc: "🔒 Mã hóa", btnDec: "🔓 Giải mã", btnLang: "🌐 Ngôn ngữ",
+    start: "<blockquote>🔐 <b>Klock</b>\nTôi là trợ lý bảo vệ dữ liệu cho bạn, để giải mã được file của tôi cần thời gian và khóa bí mật!</blockquote>\n🔒 Mã hóa: mật khẩu + thời gian → nhận link/file.\n🔓 Giải mã: gửi link/file + mật khẩu.\n\nChọn thao tác:",
+    btnEnc: "🔒 Mã hóa", btnDec: "🔓 Giải mã", btnLang: "🌐 Ngôn ngữ", btnHelp: "📘 Hướng dẫn",
     askSecretEnc: "🔑 Mật khẩu bí mật:",
     onlyText: "Vui lòng nhập dạng văn bản.",
     askMessage: "✍️ Nội dung hoặc file/ảnh cần mã hóa (≤19MB):",
     sendTextFileOrPhoto: "Gửi văn bản, file hoặc ảnh.",
     askTimeChoose: "⏰ Mở khóa lúc:",
-    p10m: "+10 phút", p1h: "+1 giờ", p6h: "+6 giờ", p1d: "+1 ngày", p3d: "+3 ngày", p1w: "+1 tuần", p1mo: "+1 tháng",
+    p1m: "+1 phút", p10m: "+10 phút", p1h: "+1 giờ", p6h: "+6 giờ", p1d: "+1 ngày", p3d: "+3 ngày", p1w: "+1 tuần", p1mo: "+1 tháng",
     pcustom: "📅 Ngày giờ khác",
-    askCustomTime: "Ngày giờ (giờ VN, UTC+7):\n`YYYY-MM-DD HH:MM`",
+    askCustomTime: "Ngày giờ ({tz}):\n`YYYY-MM-DD HH:MM`",
     badTimeFormat: "Sai định dạng. VD: `2026-12-25 08:00`",
     mustBeFuture: "Thời điểm mở khóa phải ở tương lai.",
     encrypting: "⏳ Đang mã hóa…",
     encryptedDone: "<blockquote>✅ Xong!\n🔗 {link}\nMở khóa: {time}</blockquote>",
+    btnCopyLink: "📋 Copy link",
     askDecInput: "🔗 Dán link hoặc gửi file .json:",
     invalidLink: "Link không hợp lệ.", notFound: "Không tìm thấy (hết hạn hoặc sai link).",
     jsonBadFormat: "File không đúng định dạng .json của Klock.",
@@ -116,22 +130,24 @@ const I18N = {
     cancelled: "Đã hủy. /start để bắt đầu lại.",
     chooseLang: "🌐 Chọn ngôn ngữ:", langSet: "✅ Đã đổi ngôn ngữ sang Tiếng Việt.",
     genericError: "⚠️ Lỗi: {err}", fileDownloadErr: "Không tải được file.",
+    helpText: "📘 <b>Hướng dẫn sử dụng</b>\n🔒 /encrypt — mật khẩu, nội dung/file, thời gian mở khóa → nhận link + file .json.\n🔓 /decrypt — gửi link hoặc file .json, rồi mật khẩu (sau khi tới giờ mở khóa).\n🌐 /lang — đổi ngôn ngữ.\n❌ /cancel — hủy bước đang làm.\nFile tối đa ~19MB.",
   },
   ru: {
-    start: "<blockquote>🔐 <b>Klock</b>\nЯ ваш помощник по защите данных — для расшифровки файла нужны время и секретный ключ!</blockquote>\n\nВыберите действие:",
-    btnEnc: "🔒 Зашифровать", btnDec: "🔓 Расшифровать", btnLang: "🌐 Язык",
+    start: "<blockquote>🔐 <b>Klock</b>\nЯ ваш помощник по защите данных — для расшифровки файла нужны время и секретный ключ!</blockquote>\n🔒 Шифрование: пароль + время → ссылка/файл.\n🔓 Расшифровка: ссылка/файл + пароль.\n\nВыберите действие:",
+    btnEnc: "🔒 Зашифровать", btnDec: "🔓 Расшифровать", btnLang: "🌐 Язык", btnHelp: "📘 Справка",
     askSecretEnc: "🔑 Секретный пароль:",
     onlyText: "Введите текстом.",
     askMessage: "✍️ Текст или файл/фото для шифрования (до 19МБ):",
     sendTextFileOrPhoto: "Отправьте текст, файл или фото.",
     askTimeChoose: "⏰ Разблокировать через:",
-    p10m: "+10 мин", p1h: "+1 час", p6h: "+6 часов", p1d: "+1 день", p3d: "+3 дня", p1w: "+1 неделя", p1mo: "+1 месяц",
+    p1m: "+1 мин", p10m: "+10 мин", p1h: "+1 час", p6h: "+6 часов", p1d: "+1 день", p3d: "+3 дня", p1w: "+1 неделя", p1mo: "+1 месяц",
     pcustom: "📅 Другое",
-    askCustomTime: "Дата/время (Вьетнам, UTC+7):\n`YYYY-MM-DD HH:MM`",
+    askCustomTime: "Дата/время ({tz}):\n`YYYY-MM-DD HH:MM`",
     badTimeFormat: "Неверный формат. Напр.: `2026-12-25 08:00`",
     mustBeFuture: "Время разблокировки должно быть в будущем.",
     encrypting: "⏳ Шифрование…",
     encryptedDone: "<blockquote>✅ Готово!\n🔗 {link}\nРазблокировка: {time}</blockquote>",
+    btnCopyLink: "📋 Копировать ссылку",
     askDecInput: "🔗 Вставьте ссылку или отправьте .json файл:",
     invalidLink: "Неверная ссылка.", notFound: "Не найдено (истекло или неверная ссылка).",
     jsonBadFormat: "Не корректный .json файл Klock.",
@@ -145,22 +161,24 @@ const I18N = {
     cancelled: "Отменено. /start чтобы начать снова.",
     chooseLang: "🌐 Выберите язык:", langSet: "✅ Язык изменён на русский.",
     genericError: "⚠️ Ошибка: {err}", fileDownloadErr: "Не удалось скачать файл.",
+    helpText: "📘 <b>Как использовать</b>\n🔒 /encrypt — пароль, текст/файл, время разблокировки → ссылка + .json файл.\n🔓 /decrypt — отправьте ссылку или .json файл, затем пароль (после разблокировки).\n🌐 /lang — сменить язык.\n❌ /cancel — отменить текущий шаг.\nФайлы до ~19МБ.",
   },
   zh: {
-    start: "<blockquote>🔐 <b>Klock</b>\n我是你的数据保护助手——解密文件需要时间和密钥!</blockquote>\n\n请选择操作:",
-    btnEnc: "🔒 加密", btnDec: "🔓 解密", btnLang: "🌐 语言",
+    start: "<blockquote>🔐 <b>Klock</b>\n我是你的数据保护助手——解密文件需要时间和密钥!</blockquote>\n🔒 加密:密码+时间→获得链接/文件。\n🔓 解密:发送链接/文件+密码。\n\n请选择操作:",
+    btnEnc: "🔒 加密", btnDec: "🔓 解密", btnLang: "🌐 语言", btnHelp: "📘 帮助",
     askSecretEnc: "🔑 密码:",
     onlyText: "请以文字输入。",
     askMessage: "✍️ 要加密的内容或文件/图片(≤19MB):",
     sendTextFileOrPhoto: "发送文本、文件或图片。",
     askTimeChoose: "⏰ 解锁时间:",
-    p10m: "+10分钟", p1h: "+1小时", p6h: "+6小时", p1d: "+1天", p3d: "+3天", p1w: "+1周", p1mo: "+1个月",
+    p1m: "+1分钟", p10m: "+10分钟", p1h: "+1小时", p6h: "+6小时", p1d: "+1天", p3d: "+3天", p1w: "+1周", p1mo: "+1个月",
     pcustom: "📅 自定义",
-    askCustomTime: "日期时间(越南 UTC+7):\n`YYYY-MM-DD HH:MM`",
+    askCustomTime: "日期时间({tz}):\n`YYYY-MM-DD HH:MM`",
     badTimeFormat: "格式错误,如:`2026-12-25 08:00`",
     mustBeFuture: "解锁时间必须在未来。",
     encrypting: "⏳ 正在加密…",
     encryptedDone: "<blockquote>✅ 完成!\n🔗 {link}\n解锁: {time}</blockquote>",
+    btnCopyLink: "📋 复制链接",
     askDecInput: "🔗 粘贴链接或发送 .json 文件:",
     invalidLink: "链接无效。", notFound: "未找到(已过期或链接错误)。",
     jsonBadFormat: "不是有效的 Klock .json 文件。",
@@ -174,22 +192,24 @@ const I18N = {
     cancelled: "已取消。发送 /start 重新开始。",
     chooseLang: "🌐 选择语言:", langSet: "✅ 语言已切换为中文。",
     genericError: "⚠️ 出错: {err}", fileDownloadErr: "无法下载文件。",
+    helpText: "📘 <b>使用说明</b>\n🔒 /encrypt — 密码、内容/文件、解锁时间 → 获得链接 + .json 文件。\n🔓 /decrypt — 发送链接或 .json 文件,然后输入密码(解锁后)。\n🌐 /lang — 更改语言。\n❌ /cancel — 取消当前步骤。\n文件最大约19MB。",
   },
   es: {
-    start: "<blockquote>🔐 <b>Klock</b>\nSoy tu asistente de protección de datos: para descifrar un archivo se necesitan tiempo y una clave secreta.</blockquote>\n\nElige una acción:",
-    btnEnc: "🔒 Cifrar", btnDec: "🔓 Descifrar", btnLang: "🌐 Idioma",
+    start: "<blockquote>🔐 <b>Klock</b>\nSoy tu asistente de protección de datos: para descifrar un archivo se necesitan tiempo y una clave secreta.</blockquote>\n🔒 Cifrar: contraseña + tiempo → enlace/archivo.\n🔓 Descifrar: enlace/archivo + contraseña.\n\nElige una acción:",
+    btnEnc: "🔒 Cifrar", btnDec: "🔓 Descifrar", btnLang: "🌐 Idioma", btnHelp: "📘 Ayuda",
     askSecretEnc: "🔑 Contraseña secreta:",
     onlyText: "Envíalo como texto.",
     askMessage: "✍️ Contenido o archivo/foto a cifrar (≤19MB):",
     sendTextFileOrPhoto: "Envía texto, un archivo o una foto.",
     askTimeChoose: "⏰ Desbloquear en:",
-    p10m: "+10 min", p1h: "+1 hora", p6h: "+6 horas", p1d: "+1 día", p3d: "+3 días", p1w: "+1 semana", p1mo: "+1 mes",
+    p1m: "+1 min", p10m: "+10 min", p1h: "+1 hora", p6h: "+6 horas", p1d: "+1 día", p3d: "+3 días", p1w: "+1 semana", p1mo: "+1 mes",
     pcustom: "📅 Personalizado",
-    askCustomTime: "Fecha/hora (Vietnam, UTC+7):\n`YYYY-MM-DD HH:MM`",
+    askCustomTime: "Fecha/hora ({tz}):\n`YYYY-MM-DD HH:MM`",
     badTimeFormat: "Formato incorrecto. Ej.: `2026-12-25 08:00`",
     mustBeFuture: "El momento de desbloqueo debe ser en el futuro.",
     encrypting: "⏳ Cifrando…",
     encryptedDone: "<blockquote>✅ ¡Listo!\n🔗 {link}\nDesbloquea: {time}</blockquote>",
+    btnCopyLink: "📋 Copiar enlace",
     askDecInput: "🔗 Pega el enlace o envía el archivo .json:",
     invalidLink: "Enlace no válido.", notFound: "No encontrado (caducado o enlace incorrecto).",
     jsonBadFormat: "No es un .json de Klock válido.",
@@ -203,17 +223,18 @@ const I18N = {
     cancelled: "Cancelado. /start para empezar de nuevo.",
     chooseLang: "🌐 Elige tu idioma:", langSet: "✅ Idioma cambiado a español.",
     genericError: "⚠️ Error: {err}", fileDownloadErr: "No se pudo descargar el archivo.",
+    helpText: "📘 <b>Cómo usarlo</b>\n🔒 /encrypt — contraseña, contenido/archivo, hora de desbloqueo → enlace + archivo .json.\n🔓 /decrypt — envía el enlace o el archivo .json, luego la contraseña (tras desbloquear).\n🌐 /lang — cambiar idioma.\n❌ /cancel — cancelar el paso actual.\nArchivos hasta ~19MB.",
   },
 };
 
 // Mô tả lệnh hiển thị trong menu (nút "/") của Telegram, theo từng ngôn ngữ đã chọn
 // — đặt riêng theo scope "chat" cho mỗi chatId, vì setMyCommands không nhận {key} nội suy.
 const COMMAND_I18N = {
-  en: { start: "Open the Klock menu", encrypt: "Encrypt a message/file with a time-lock", decrypt: "Decrypt a link or received file", lang: "Change language", cancel: "Cancel the current operation" },
-  vi: { start: "Mở menu Klock", encrypt: "Mã hóa tin nhắn/file theo thời gian", decrypt: "Giải mã link hoặc file đã nhận", lang: "Đổi ngôn ngữ", cancel: "Hủy thao tác hiện tại" },
-  ru: { start: "Открыть меню Klock", encrypt: "Зашифровать сообщение/файл с таймлоком", decrypt: "Расшифровать ссылку или файл", lang: "Сменить язык", cancel: "Отменить текущую операцию" },
-  zh: { start: "打开 Klock 菜单", encrypt: "按时间锁加密消息/文件", decrypt: "解密链接或收到的文件", lang: "更改语言", cancel: "取消当前操作" },
-  es: { start: "Abrir el menú de Klock", encrypt: "Cifrar un mensaje/archivo con bloqueo temporal", decrypt: "Descifrar un enlace o archivo recibido", lang: "Cambiar idioma", cancel: "Cancelar la operación actual" },
+  en: { start: "Open the Klock menu", encrypt: "Encrypt a message/file with a time-lock", decrypt: "Decrypt a link or received file", lang: "Change language", help: "How to use this bot", cancel: "Cancel the current operation" },
+  vi: { start: "Mở menu Klock", encrypt: "Mã hóa tin nhắn/file theo thời gian", decrypt: "Giải mã link hoặc file đã nhận", lang: "Đổi ngôn ngữ", help: "Hướng dẫn sử dụng bot", cancel: "Hủy thao tác hiện tại" },
+  ru: { start: "Открыть меню Klock", encrypt: "Зашифровать сообщение/файл с таймлоком", decrypt: "Расшифровать ссылку или файл", lang: "Сменить язык", help: "Как использовать бота", cancel: "Отменить текущую операцию" },
+  zh: { start: "打开 Klock 菜单", encrypt: "按时间锁加密消息/文件", decrypt: "解密链接或收到的文件", lang: "更改语言", help: "使用说明", cancel: "取消当前操作" },
+  es: { start: "Abrir el menú de Klock", encrypt: "Cifrar un mensaje/archivo con bloqueo temporal", decrypt: "Descifrar un enlace o archivo recibido", lang: "Cambiar idioma", help: "Cómo usar este bot", cancel: "Cancelar la operación actual" },
 };
 
 function applyCommandsForChat(chatId) {
@@ -224,6 +245,7 @@ function applyCommandsForChat(chatId) {
       { command: "encrypt", description: c.encrypt },
       { command: "decrypt", description: c.decrypt },
       { command: "lang", description: c.lang },
+      { command: "help", description: c.help },
       { command: "cancel", description: c.cancel },
     ],
     { scope: { type: "chat", chat_id: chatId } }
@@ -330,12 +352,12 @@ function unlockCodeFromDate(unlockMs) {
   return { x0, code: x0 + dateStr };
 }
 
-// Nhận "YYYY-MM-DD HH:MM" hoặc "YYYY-MM-DD HH:MM:SS" theo giờ Việt Nam (UTC+7) -> unix ms (UTC thật)
-function parseVnDateTime(input) {
+// Nhận "YYYY-MM-DD HH:MM" hoặc "YYYY-MM-DD HH:MM:SS" theo múi giờ của ngôn ngữ đang chọn -> unix ms (UTC thật)
+function parseCustomDateTime(input, chatId) {
   const m = input.trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
   if (!m) return null;
   const [, y, mo, d, h, mi, se] = m;
-  const ms = Date.UTC(+y, +mo - 1, +d, +h, +mi, +(se || 0)) - VN_OFFSET_MIN * 60000;
+  const ms = Date.UTC(+y, +mo - 1, +d, +h, +mi, +(se || 0)) - tzOffsetMin(chatId) * 60000;
   return Number.isNaN(ms) ? null : ms;
 }
 
@@ -351,10 +373,11 @@ function fmtRemaining(ms, chatId) {
   return parts.join(" ");
 }
 
-// Nhãn thời gian mở khóa hiển thị trong kết quả — giờ VN cho dễ đọc với mọi preset/custom.
-function fmtVnTime(ms) {
-  const t = new Date(ms + VN_OFFSET_MIN * 60000);
-  return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1, 2)}-${pad(t.getUTCDate(), 2)} ${pad(t.getUTCHours(), 2)}:${pad(t.getUTCMinutes(), 2)} (UTC+7)`;
+// Nhãn thời gian mở khóa hiển thị trong kết quả — theo múi giờ của ngôn ngữ đang chọn.
+function fmtTzTime(ms, chatId) {
+  const off = tzOffsetMin(chatId);
+  const t = new Date(ms + off * 60000);
+  return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1, 2)}-${pad(t.getUTCDate(), 2)} ${pad(t.getUTCHours(), 2)}:${pad(t.getUTCMinutes(), 2)} (${tzLabel(chatId)})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -367,8 +390,14 @@ const resetState = (chatId) => states.delete(chatId);
 function mainMenu(chatId) {
   return { reply_markup: { inline_keyboard: [
     [{ text: t(chatId, "btnEnc"), callback_data: "enc" }, { text: t(chatId, "btnDec"), callback_data: "dec" }],
-    [{ text: t(chatId, "btnLang"), callback_data: "langmenu" }],
+    [{ text: t(chatId, "btnHelp"), callback_data: "help" }, { text: t(chatId, "btnLang"), callback_data: "langmenu" }],
   ] } };
+}
+
+// Gửi lại đúng tin nhắn/menu như /start — dùng để người dùng thao tác tiếp ngay sau khi
+// mã hóa/giải mã xong, không cần tự gõ /start lại.
+function sendMenu(chatId) {
+  bot.sendMessage(chatId, t(chatId, "start"), { parse_mode: "HTML", ...mainMenu(chatId) });
 }
 
 function langMenu() {
@@ -380,7 +409,7 @@ function langMenu() {
 }
 
 const TIME_PRESETS = [
-  ["p10m", 10], ["p1h", 60], ["p6h", 6 * 60], ["p1d", 24 * 60],
+  ["p1m", 1], ["p10m", 10], ["p1h", 60], ["p6h", 6 * 60], ["p1d", 24 * 60],
   ["p3d", 3 * 24 * 60], ["p1w", 7 * 24 * 60], ["p1mo", 30 * 24 * 60],
 ];
 
@@ -399,6 +428,7 @@ bot.setMyCommands([
   { command: "encrypt", description: "Encrypt a message/file with a time-lock" },
   { command: "decrypt", description: "Decrypt a link or received file" },
   { command: "lang", description: "Change language" },
+  { command: "help", description: "How to use this bot" },
   { command: "cancel", description: "Cancel the current operation" },
 ]).catch(() => {});
 
@@ -406,7 +436,7 @@ bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   if (!chatLang.has(chatId)) setLang(chatId, inferLang(msg.from && msg.from.language_code));
   resetState(chatId);
-  bot.sendMessage(chatId, t(chatId, "start"), { parse_mode: "HTML", ...mainMenu(chatId) });
+  sendMenu(chatId);
 });
 
 bot.onText(/\/cancel/, (msg) => {
@@ -416,6 +446,10 @@ bot.onText(/\/cancel/, (msg) => {
 
 bot.onText(/\/lang/, (msg) => {
   bot.sendMessage(msg.chat.id, t(msg.chat.id, "chooseLang"), langMenu());
+});
+
+bot.onText(/\/help/, (msg) => {
+  bot.sendMessage(msg.chat.id, t(msg.chat.id, "helpText"), { parse_mode: "HTML" });
 });
 
 bot.onText(/\/encrypt/, (msg) => startEncrypt(msg.chat.id));
@@ -428,6 +462,7 @@ bot.on("callback_query", async (q) => {
 
   if (data === "enc") return startEncrypt(chatId);
   if (data === "dec") return startDecrypt(chatId);
+  if (data === "help") return bot.sendMessage(chatId, t(chatId, "helpText"), { parse_mode: "HTML" });
   if (data === "langmenu") return bot.sendMessage(chatId, t(chatId, "chooseLang"), langMenu());
   if (data.startsWith("lang:")) {
     const lang = data.slice(5);
@@ -444,11 +479,11 @@ bot.on("callback_query", async (q) => {
     const val = data.slice(3);
     if (val === "custom") {
       st.step = "time_custom";
-      return bot.sendMessage(chatId, t(chatId, "askCustomTime"), { parse_mode: "Markdown" });
+      return bot.sendMessage(chatId, t(chatId, "askCustomTime", { tz: tzLabel(chatId) }), { parse_mode: "Markdown" });
     }
     const unlockMs = Date.now() + Number(val) * 60000;
     try {
-      await performEncrypt(chatId, st, unlockMs, fmtVnTime(unlockMs));
+      await performEncrypt(chatId, st, unlockMs, fmtTzTime(unlockMs, chatId));
     } catch (e) {
       console.error("klock-bot lỗi:", e);
       bot.sendMessage(chatId, t(chatId, "genericError", { err: e.message }));
@@ -529,8 +564,12 @@ async function performEncrypt(chatId, st, unlockMs, timeLabel) {
 
   const { slug } = await apiEncrypt(code, wrapped);
   const link = `${PUBLIC_BASE}/${slug}`;
-  bot.sendMessage(chatId, t(chatId, "encryptedDone", { link, time: timeLabel }), { parse_mode: "HTML" });
+  bot.sendMessage(chatId, t(chatId, "encryptedDone", { link, time: timeLabel }), {
+    parse_mode: "HTML",
+    reply_markup: { inline_keyboard: [[{ text: t(chatId, "btnCopyLink"), copy_text: { text: link } }]] },
+  });
   resetState(chatId);
+  sendMenu(chatId);
 }
 
 async function handleEncryptMsg(chatId, st, msg) {
@@ -563,9 +602,9 @@ async function handleEncryptMsg(chatId, st, msg) {
 
   if (st.step === "time_custom") {
     if (!msg.text) return bot.sendMessage(chatId, t(chatId, "badTimeFormat"), { parse_mode: "Markdown" });
-    const unlockMs = parseVnDateTime(msg.text);
+    const unlockMs = parseCustomDateTime(msg.text, chatId);
     if (unlockMs === null) return bot.sendMessage(chatId, t(chatId, "badTimeFormat"), { parse_mode: "Markdown" });
-    await performEncrypt(chatId, st, unlockMs, `${msg.text} (UTC+7)`);
+    await performEncrypt(chatId, st, unlockMs, `${msg.text} (${tzLabel(chatId)})`);
   }
 }
 
@@ -648,6 +687,7 @@ async function handleDecryptMsg(chatId, st, msg) {
       await bot.sendMessage(chatId, t(chatId, "decryptedResult", { text: envelope.text }));
     }
     resetState(chatId);
+    sendMenu(chatId);
   }
 }
 
