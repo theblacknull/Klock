@@ -86,7 +86,6 @@ const I18N = {
     encrypting: "⏳ Encrypting…",
     encryptedDone: "<blockquote>✅ Done!\n🔗 {link}\nUnlocks: {time}</blockquote>",
     btnCopyLink: "📋 Copy link",
-    fileSafetyNote: "⚠️ Safe before the unlock time. After that, security depends on your password's strength — don't store this file somewhere easily accessible.",
     askDecInput: "🔗 Paste a link or send the .json file:",
     invalidLink: "Invalid link.", notFound: "Not found (expired or wrong link).",
     jsonBadFormat: "Not a valid Klock .json file.",
@@ -118,7 +117,6 @@ const I18N = {
     encrypting: "⏳ Đang mã hóa…",
     encryptedDone: "<blockquote>✅ Xong!\n🔗 {link}\nMở khóa: {time}</blockquote>",
     btnCopyLink: "📋 Copy link",
-    fileSafetyNote: "⚠️ An toàn trước giờ mở khóa. Sau đó bảo mật phụ thuộc vào độ mạnh mật khẩu — không nên lưu file này ở nơi dễ bị truy cập.",
     askDecInput: "🔗 Dán link hoặc gửi file .json:",
     invalidLink: "Link không hợp lệ.", notFound: "Không tìm thấy (hết hạn hoặc sai link).",
     jsonBadFormat: "File không đúng định dạng .json của Klock.",
@@ -150,7 +148,6 @@ const I18N = {
     encrypting: "⏳ Шифрование…",
     encryptedDone: "<blockquote>✅ Готово!\n🔗 {link}\nРазблокировка: {time}</blockquote>",
     btnCopyLink: "📋 Копировать ссылку",
-    fileSafetyNote: "⚠️ Безопасен до момента разблокировки. После — защита зависит от надёжности пароля, не храните файл в легко доступном месте.",
     askDecInput: "🔗 Вставьте ссылку или отправьте .json файл:",
     invalidLink: "Неверная ссылка.", notFound: "Не найдено (истекло или неверная ссылка).",
     jsonBadFormat: "Не корректный .json файл Klock.",
@@ -182,7 +179,6 @@ const I18N = {
     encrypting: "⏳ 正在加密…",
     encryptedDone: "<blockquote>✅ 完成!\n🔗 {link}\n解锁: {time}</blockquote>",
     btnCopyLink: "📋 复制链接",
-    fileSafetyNote: "⚠️ 解锁前是安全的。解锁后安全性取决于密码强度——请勿将此文件存放在容易被访问的地方。",
     askDecInput: "🔗 粘贴链接或发送 .json 文件:",
     invalidLink: "链接无效。", notFound: "未找到(已过期或链接错误)。",
     jsonBadFormat: "不是有效的 Klock .json 文件。",
@@ -214,7 +210,6 @@ const I18N = {
     encrypting: "⏳ Cifrando…",
     encryptedDone: "<blockquote>✅ ¡Listo!\n🔗 {link}\nDesbloquea: {time}</blockquote>",
     btnCopyLink: "📋 Copiar enlace",
-    fileSafetyNote: "⚠️ Seguro antes del desbloqueo. Después, la seguridad depende de la fortaleza de tu contraseña — no guardes este archivo en un lugar de fácil acceso.",
     askDecInput: "🔗 Pega el enlace o envía el archivo .json:",
     invalidLink: "Enlace no válido.", notFound: "No encontrado (caducado o enlace incorrecto).",
     jsonBadFormat: "No es un .json de Klock válido.",
@@ -573,7 +568,7 @@ async function performEncrypt(chatId, st, unlockMs, timeLabel) {
 
   // Gửi file .klock trước (không cần server) — giống nguyên tắc bên web.
   const fileJson = Buffer.from(JSON.stringify({ code, wrapped }));
-  await bot.sendDocument(chatId, fileJson, { caption: t(chatId, "fileSafetyNote") }, { filename: `klock-${x0}.json`, contentType: "application/json" });
+  await bot.sendDocument(chatId, fileJson, {}, { filename: `klock-${x0}.json`, contentType: "application/json" });
 
   const { slug } = await apiEncrypt(code, wrapped);
   const link = `${PUBLIC_BASE}/${slug}`;
